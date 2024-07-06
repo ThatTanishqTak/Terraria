@@ -16,27 +16,47 @@ typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
 
-global_variable bool running;
-
-global_variable BITMAPINFO bitmapInfo;
-global_variable void* bitmapMemory;
-
-global_variable int bitmapWidth;
-global_variable int bitmapHeight;
-global_variable int bytesPerPixel = 4;
-
-internal void Render(int xOffset, int yOffset)
+struct Win32_Offscreen_Buffer
 {
-    int width = bitmapWidth;
-    int height = bitmapHeight;
+    BITMAPINFO Info;
+    
+    void* Memory;
 
-    int pitch = width * bytesPerPixel;
+    int Width;
+    int Height;
+    int Pitch;
+    int BytesPerPixel;
+};
 
-    uint8* row = (uint8*)bitmapMemory;
-    for (int y = 0; y < bitmapHeight; ++y)
+struct Win32_Window_Dimension
+{
+    int Width;
+    int Height;
+};
+
+global_variable bool running;
+global_variable Win32_Offscreen_Buffer globalBackBuffer;
+
+Win32_Window_Dimension Win32_GetWindowDimension(HWND Window)
+{
+    Win32_Window_Dimension result;
+
+    RECT clientRect;
+    GetClientRect(Window, &clientRect);
+    
+    result.Height = clientRect.bottom - clientRect.top;  // Height of the area to be painted
+    result.Width = clientRect.right - clientRect.left;   // Width of the area to be painted
+
+    return result;
+}
+
+internal void Render(Win32_Offscreen_Buffer* buffer, int xOffset, int yOffset)
+{
+    uint8* row = (uint8*)buffer->Memory;
+    for (int y = 0; y < buffer->Height; ++y)
     {
         uint32* pixels = (uint32*)row;
-        for (int x = 0; x < bitmapWidth; ++x)
+        for (int x = 0; x < buffer->Width; ++x)
         {
             uint8 blue = (x + xOffset);
             uint8 green = (y + yOffset);
@@ -44,28 +64,29 @@ internal void Render(int xOffset, int yOffset)
             *pixels++ = ((green << 8) | blue);
         }
 
-        row += pitch;
+        row += buffer->Pitch;
     }
 }
 
-internal void Win32_ResizeDIBSection(int width, int height)
+internal void Win32_ResizeDIBSection(Win32_Offscreen_Buffer* buffer, int width, int height)
 {
-    if (bitmapMemory)
+    if (buffer->Memory)
     {
-        VirtualFree(bitmapMemory,  // Address to where the memory is
-                    NULL,          // Size of the memory to the region to be freed (If NULL means the entire block)
-                    MEM_RELEASE);  // Releases the specified region of pages
+        VirtualFree(buffer->Memory,  // Address to where the memory is
+                    NULL,            // Size of the memory to the region to be freed (If NULL means the entire block)
+                    MEM_RELEASE);    // Releases the specified region of pages
     }
 
-    bitmapWidth = width;
-    bitmapHeight = height;
+    buffer->Width = width;
+    buffer->Height = height;
+    buffer->BytesPerPixel = 4;
 
-    bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);
-    bitmapInfo.bmiHeader.biWidth = bitmapWidth;
-    bitmapInfo.bmiHeader.biHeight = -bitmapHeight;
-    bitmapInfo.bmiHeader.biPlanes = 1;
-    bitmapInfo.bmiHeader.biBitCount = 32;
-    bitmapInfo.bmiHeader.biCompression = BI_RGB;
+    buffer->Info.bmiHeader.biSize = sizeof(buffer->Info.bmiHeader);
+    buffer->Info.bmiHeader.biWidth = buffer->Width;
+    buffer->Info.bmiHeader.biHeight = -buffer->Height;
+    buffer->Info.bmiHeader.biPlanes = 1;
+    buffer->Info.bmiHeader.biBitCount = 32;
+    buffer->Info.bmiHeader.biCompression = BI_RGB;
 
     /*----------------------------------------------//
        bitmapInfo.bmiHeader.biSizeImage     = 0;
@@ -75,30 +96,28 @@ internal void Win32_ResizeDIBSection(int width, int height)
        bitmapInfo.bmiHeader.biClrImportant  = 0;
     //----------------------------------------------*/
 
-    int bitmapMemorySize = (bitmapWidth * bitmapHeight)* bytesPerPixel;
+    int bitmapMemorySize = (buffer->Width * buffer->Height)* buffer->BytesPerPixel;
 
-    bitmapMemory = VirtualAlloc(NULL, bitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
+    buffer->Memory = VirtualAlloc(NULL, bitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
+    buffer->Pitch = width * buffer->BytesPerPixel;
 }
 
-internal void Win32_UpdateWindow(HDC deviceContext, RECT clientRect, int x, int y, int width, int height)
+internal void Win32_DisplayBufferInWindow(HDC deviceContext, int windowWidth, int windowHeight, Win32_Offscreen_Buffer buffer, int x, int y, int width, int height)
 {
-    int windowWidth = clientRect.right - clientRect.left;
-    int windowHeight = clientRect.bottom - clientRect.top;
-
-     StretchDIBits(deviceContext,                    // Active device context
-                   0, 0, bitmapWidth, bitmapHeight,  // Destination
-                   0, 0, windowWidth, windowHeight,  // Source
-                   bitmapMemory,                     // Bitmap memory
-                   &bitmapInfo,                      // Bitmap information
-                   DIB_RGB_COLORS,                   // Color palate
-                   SRCCOPY);                         // DWORD property
+     StretchDIBits(deviceContext,                      // Active device context
+                   0, 0, windowWidth, windowHeight,    // Destination
+                   0, 0, buffer.Width, buffer.Height,  // Source
+                   buffer.Memory,                      // Bitmap memory
+                   &buffer.Info,                       // Bitmap information
+                   DIB_RGB_COLORS,                     // Color palate
+                   SRCCOPY);                           // DWORD property
 }
 
 // Callback function for handling window messages
-LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,   // Handles window
-                                          UINT Message,  // The callback message (unsigned int)
-                                          WPARAM WParam, // Word-Parameter (unsigned int pointer)
-                                          LPARAM LParam) // Long-Parameter (long pointer)
+LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles window
+                                          UINT Message,   // The callback message (unsigned int)
+                                          WPARAM WParam,  // Word-Parameter (unsigned int pointer)
+                                          LPARAM LParam)  // Long-Parameter (long pointer)
 {
     LRESULT result = 0; // Initialize result variable
 
@@ -108,13 +127,7 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,   // Handles window
         // Handle size change event
         case WM_SIZE:
         {
-            RECT clientRect;
-            GetClientRect(Window, &clientRect);
 
-            int height = clientRect.bottom - clientRect.top; // Height of the area to be painted
-            int width = clientRect.right - clientRect.left; // Width of the area to be painted
-
-            Win32_ResizeDIBSection(width, height);
         } 
         break;
 
@@ -149,10 +162,8 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,   // Handles window
             int width = PaintStruct.rcPaint.right - PaintStruct.rcPaint.left;   // Width of the area to be painted
             local_persist DWORD operation = BLACKNESS;                          // Operation to perform (fill with black color)
 
-            RECT clientRect;
-            GetClientRect(Window, &clientRect);
-
-            Win32_UpdateWindow(deviceContext, clientRect, x, y, width, height);
+            Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
+            Win32_DisplayBufferInWindow(deviceContext, dimension.Width, dimension.Height, globalBackBuffer, x, y, width, height);
 
             EndPaint(Window, &PaintStruct); // End painting
         }
@@ -161,7 +172,6 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,   // Handles window
         // Default handler for unhandled messages
         default:
         {
-            //OutputDebugStringA("default\n"); // Debug output
             result = DefWindowProc(Window, Message, WParam, LParam); // Call the default window procedure
         }
         break;
@@ -178,6 +188,8 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
 {
     WNDCLASS WindowClass = {}; // Initialize window class structure
 
+    Win32_ResizeDIBSection(&globalBackBuffer, 1280, 720);
+
     // Configure window class properties
     WindowClass.style = CS_HREDRAW | CS_VREDRAW;           // Style flags
     WindowClass.lpfnWndProc = Win32_MainWindowCallBack;    // Pointer to window procedure
@@ -189,18 +201,18 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
     if (RegisterClass(&WindowClass))
     {
         // Create the window
-        HWND Window = CreateWindowEx(NULL,                                // Optional window style
-                                     WindowClass.lpszClassName,           // Long pointer to the class name
-                                     L"Terraria-Clone",                   // Window title
-                                     WS_OVERLAPPEDWINDOW | WS_VISIBLE,    // Window style
-                                     CW_USEDEFAULT,                       // X-Position
-                                     CW_USEDEFAULT,                       // Y-Position
-                                     CW_USEDEFAULT,                       // Width
-                                     CW_USEDEFAULT,                       // Height
-                                     NULL,                                // Set parent window
-                                     NULL,                                // Set menu
-                                     Instance,                            // Active window instance
-                                     NULL);                               // Additional application data (Long void pointer)
+        HWND Window = CreateWindowEx(NULL,                              // Optional window style
+                                     WindowClass.lpszClassName,         // Long pointer to the class name
+                                     L"Terraria-Clone",                 // Window title
+                                     WS_OVERLAPPEDWINDOW | WS_VISIBLE,  // Window style
+                                     CW_USEDEFAULT,                     // X-Position
+                                     CW_USEDEFAULT,                     // Y-Position
+                                     CW_USEDEFAULT,                     // Width
+                                     CW_USEDEFAULT,                     // Height
+                                     NULL,                              // Set parent window
+                                     NULL,                              // Set menu
+                                     Instance,                          // Active window instance
+                                     NULL);                             // Additional application data (Long void pointer)
 
         if (Window) // Check if window creation was successful
         {
@@ -224,16 +236,12 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                     DispatchMessage(&message); // Dispatches a message to a window procedure
                 }
 
-                Render(xOffset, yOffset);
+                Render(&globalBackBuffer, xOffset, yOffset);
 
                 HDC deviceContext = GetDC(Window);
-                RECT clientRect;
-                GetClientRect(Window, &clientRect);
+                Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
                 
-                int windowWidth = clientRect.right - clientRect.left;
-                int windowHeight = clientRect.bottom - clientRect.top;
-                
-                Win32_UpdateWindow(deviceContext, clientRect, 0, 0, windowWidth, windowHeight);
+                Win32_DisplayBufferInWindow(deviceContext, dimension.Width, dimension.Height, globalBackBuffer, 0, 0, dimension.Width, dimension.Height);
                 ReleaseDC(Window, deviceContext);
 
                 xOffset++;
