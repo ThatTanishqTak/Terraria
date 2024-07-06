@@ -19,7 +19,7 @@ typedef uint64_t uint64;
 struct Win32_Offscreen_Buffer
 {
     BITMAPINFO Info;
-    
+
     void* Memory;
 
     int Width;
@@ -43,7 +43,7 @@ Win32_Window_Dimension Win32_GetWindowDimension(HWND Window)
 
     RECT clientRect;
     GetClientRect(Window, &clientRect);
-    
+
     result.Height = clientRect.bottom - clientRect.top;  // Height of the area to be painted
     result.Width = clientRect.right - clientRect.left;   // Width of the area to be painted
 
@@ -96,7 +96,7 @@ internal void Win32_ResizeDIBSection(Win32_Offscreen_Buffer* buffer, int width, 
        bitmapInfo.bmiHeader.biClrImportant  = 0;
     //----------------------------------------------*/
 
-    int bitmapMemorySize = (buffer->Width * buffer->Height)* buffer->BytesPerPixel;
+    int bitmapMemorySize = (buffer->Width * buffer->Height) * buffer->BytesPerPixel;
 
     buffer->Memory = VirtualAlloc(NULL, bitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
     buffer->Pitch = width * buffer->BytesPerPixel;
@@ -104,13 +104,13 @@ internal void Win32_ResizeDIBSection(Win32_Offscreen_Buffer* buffer, int width, 
 
 internal void Win32_DisplayBufferInWindow(HDC deviceContext, int windowWidth, int windowHeight, Win32_Offscreen_Buffer buffer, int x, int y, int width, int height)
 {
-     StretchDIBits(deviceContext,                      // Active device context
-                   0, 0, windowWidth, windowHeight,    // Destination
-                   0, 0, buffer.Width, buffer.Height,  // Source
-                   buffer.Memory,                      // Bitmap memory
-                   &buffer.Info,                       // Bitmap information
-                   DIB_RGB_COLORS,                     // Color palate
-                   SRCCOPY);                           // DWORD property
+    StretchDIBits(deviceContext,                      // Active device context
+                  0, 0, windowWidth, windowHeight,    // Destination
+                  0, 0, buffer.Width, buffer.Height,  // Source
+                  buffer.Memory,                      // Bitmap memory
+                  &buffer.Info,                       // Bitmap information
+                  DIB_RGB_COLORS,                     // Color palate
+                  SRCCOPY);                           // DWORD property
 }
 
 // Callback function for handling window messages
@@ -128,7 +128,7 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles window
         case WM_SIZE:
         {
 
-        } 
+        }
         break;
 
         // Handle close request
@@ -141,7 +141,7 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles window
         // Handle application activation/deactivation
         case WM_ACTIVATEAPP: { OutputDebugStringA("WM_ACTIVEAPP\n"); } // Debug output
         break;
-        
+
         // Handle window destroy event
         case WM_DESTROY:
         {
@@ -240,7 +240,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
 
                 HDC deviceContext = GetDC(Window);
                 Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
-                
+
                 Win32_DisplayBufferInWindow(deviceContext, dimension.Width, dimension.Height, globalBackBuffer, 0, 0, dimension.Width, dimension.Height);
                 ReleaseDC(Window, deviceContext);
 
