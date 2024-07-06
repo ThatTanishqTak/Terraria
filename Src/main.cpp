@@ -25,12 +25,12 @@ global_variable int bitmapWidth;
 global_variable int bitmapHeight;
 global_variable int bytesPerPixel = 4;
 
-internal void Rendering(int xOffset, int yOffset)
+internal void Render(int xOffset, int yOffset)
 {
     int width = bitmapWidth;
     int height = bitmapHeight;
 
-     int pitch = width * bytesPerPixel;
+    int pitch = width * bytesPerPixel;
 
     uint8* row = (uint8*)bitmapMemory;
     for (int y = 0; y < bitmapHeight; ++y)
@@ -52,7 +52,9 @@ internal void Win32_ResizeDIBSection(int width, int height)
 {
     if (bitmapMemory)
     {
-        VirtualFree(bitmapMemory, NULL, MEM_RELEASE);
+        VirtualFree(bitmapMemory,  // Address to where the memory is
+                    NULL,          // Size of the memory to the region to be freed (If NULL means the entire block)
+                    MEM_RELEASE);  // Releases the specified region of pages
     }
 
     bitmapWidth = width;
@@ -65,32 +67,31 @@ internal void Win32_ResizeDIBSection(int width, int height)
     bitmapInfo.bmiHeader.biBitCount = 32;
     bitmapInfo.bmiHeader.biCompression = BI_RGB;
 
-    /*--------------------------------------------- 
+    /*----------------------------------------------//
        bitmapInfo.bmiHeader.biSizeImage     = 0;
-       bitmapInfo.bmiHeader.biXPelsPerMeter = 0;                                                                   
+       bitmapInfo.bmiHeader.biXPelsPerMeter = 0;
        bitmapInfo.bmiHeader.biYPelsPerMeter = 0;       [[ "bitmapInfo" IS A STATIC VARIABLE SO ALL THESE ARE INITIALIZE TO 0 AUTOMATICALLY ]]
        bitmapInfo.bmiHeader.biClrUsed       = 0;
-       bitmapInfo.bmiHeader.biClrImportant  = 0; 
-    ----------------------------------------------*/
-
+       bitmapInfo.bmiHeader.biClrImportant  = 0;
+    //----------------------------------------------*/
 
     int bitmapMemorySize = (bitmapWidth * bitmapHeight)* bytesPerPixel;
 
     bitmapMemory = VirtualAlloc(NULL, bitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
 }
 
-internal void Win32_UpdateWindow(HDC deviceContext, RECT* clientRect, int x, int y, int width, int height)
+internal void Win32_UpdateWindow(HDC deviceContext, RECT clientRect, int x, int y, int width, int height)
 {
-    int windowWidth = clientRect->right - clientRect->left;
-    int windowHeight = clientRect->bottom - clientRect->top;
+    int windowWidth = clientRect.right - clientRect.left;
+    int windowHeight = clientRect.bottom - clientRect.top;
 
-     StretchDIBits(deviceContext,                   // Active device context
-                   0, 0, bitmapWidth, bitmapHeight, // Destination
-                   0, 0, windowWidth, windowHeight, // Source
-                   bitmapMemory,                    // Bitmap memory
-                   &bitmapInfo,                     // Bitmap information
-                   DIB_RGB_COLORS,                  // Color palate
-                   SRCCOPY);                        // DWORD property
+     StretchDIBits(deviceContext,                    // Active device context
+                   0, 0, bitmapWidth, bitmapHeight,  // Destination
+                   0, 0, windowWidth, windowHeight,  // Source
+                   bitmapMemory,                     // Bitmap memory
+                   &bitmapInfo,                      // Bitmap information
+                   DIB_RGB_COLORS,                   // Color palate
+                   SRCCOPY);                         // DWORD property
 }
 
 // Callback function for handling window messages
@@ -131,6 +132,7 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,   // Handles window
         // Handle window destroy event
         case WM_DESTROY:
         {
+            // Error handling and maybe restart the window as this should only be called when the window is closed due to an error
             running = false;
         }
         break;
@@ -150,7 +152,7 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,   // Handles window
             RECT clientRect;
             GetClientRect(Window, &clientRect);
 
-            Win32_UpdateWindow(deviceContext, &clientRect, x, y, width, height);
+            Win32_UpdateWindow(deviceContext, clientRect, x, y, width, height);
 
             EndPaint(Window, &PaintStruct); // End painting
         }
@@ -169,12 +171,15 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,   // Handles window
 }
 
 // Entry point for a Windows application
-int WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, PSTR CommandLine, int ShowCode)
+int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
+                   HINSTANCE PrevInstance,  // Pervious handle to the instance (WAS USED IN 16-BIT WINDOWS, NOW IS ALWAYS 0)
+                   PSTR CommandLine,        // The command-line argument as an Unicode string
+                   int ShowCode)            // Will be used when doing error handling
 {
     WNDCLASS WindowClass = {}; // Initialize window class structure
 
     // Configure window class properties
-    WindowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW; // Style flags
+    WindowClass.style = CS_HREDRAW | CS_VREDRAW; // Style flags
     WindowClass.lpfnWndProc = Win32_MainWindowCallBack; // Pointer to window procedure
     WindowClass.hInstance = Instance; // Instance handle
     //WindowClass.hIcon = Icon; // Uncomment and initialize if needed
@@ -184,18 +189,18 @@ int WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, PSTR CommandLine,
     if (RegisterClass(&WindowClass))
     {
         // Create the window
-        HWND Window = CreateWindowEx(NULL,                                // Set DWORD ExStyle
+        HWND Window = CreateWindowEx(NULL,                                // Optional window style
                                      WindowClass.lpszClassName,           // Long pointer to the class name
                                      L"Terraria-Clone",                   // Window title
-                                     WS_OVERLAPPEDWINDOW | WS_VISIBLE,    // DWORD properties
+                                     WS_OVERLAPPEDWINDOW | WS_VISIBLE,    // Window style
                                      CW_USEDEFAULT,                       // X-Position
                                      CW_USEDEFAULT,                       // Y-Position
                                      CW_USEDEFAULT,                       // Width
                                      CW_USEDEFAULT,                       // Height
-                                     NULL,                                // Set parent
+                                     NULL,                                // Set parent window
                                      NULL,                                // Set menu
                                      Instance,                            // Active window instance
-                                     NULL);                               // Long pointer to a void
+                                     NULL);                               // Additional application data (Long void pointer)
 
         if (Window) // Check if window creation was successful
         {
@@ -206,9 +211,12 @@ int WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, PSTR CommandLine,
             running = true;
             while (running)
             {
-
                 MSG message; // Message structure
-                while (PeekMessage(&message, NULL, NULL, NULL, PM_REMOVE))
+                while (PeekMessage(&message,    // Long-pointer to the message structure
+                                   NULL,        // Handle to the current window (NULL means it will receive message from any window)
+                                   NULL,        // For minimum message range (NULL means there is no range)
+                                   NULL,        // For maximum message range (NULL means there is no range)
+                                   PM_REMOVE))  // A flag so that messages are removed from the queue after processing by PeekMessage
                 {
                     if (message.message == WM_QUIT) { running = false; }
 
@@ -216,15 +224,16 @@ int WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, PSTR CommandLine,
                     DispatchMessage(&message); // Dispatches a message to a window procedure
                 }
 
-                Rendering(xOffset, yOffset);
+                Render(xOffset, yOffset);
 
                 HDC deviceContext = GetDC(Window);
-
                 RECT clientRect;
                 GetClientRect(Window, &clientRect);
+                
                 int windowWidth = clientRect.right - clientRect.left;
                 int windowHeight = clientRect.bottom - clientRect.top;
-                Win32_UpdateWindow(deviceContext, &clientRect, 0, 0, windowWidth, windowHeight);
+                
+                Win32_UpdateWindow(deviceContext, clientRect, 0, 0, windowWidth, windowHeight);
                 ReleaseDC(Window, deviceContext);
 
                 xOffset++;
