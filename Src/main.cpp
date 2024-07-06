@@ -143,11 +143,11 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,   // Handles window
             PAINTSTRUCT PaintStruct; // Structure containing information about painting
             HDC deviceContext = BeginPaint(Window, &PaintStruct); // Start painting
 
-            int x = PaintStruct.rcPaint.left; // Left edge of the area to be painted
-            int y = PaintStruct.rcPaint.top; // Top edge of the area to be painted
-            int height = PaintStruct.rcPaint.bottom - PaintStruct.rcPaint.top; // Height of the area to be painted
-            int width = PaintStruct.rcPaint.right - PaintStruct.rcPaint.left; // Width of the area to be painted
-            local_persist DWORD operation = BLACKNESS; // Operation to perform (fill with black color)
+            int x = PaintStruct.rcPaint.left;                                   // Left edge of the area to be painted
+            int y = PaintStruct.rcPaint.top;                                    // Top edge of the area to be painted
+            int height = PaintStruct.rcPaint.bottom - PaintStruct.rcPaint.top;  // Height of the area to be painted
+            int width = PaintStruct.rcPaint.right - PaintStruct.rcPaint.left;   // Width of the area to be painted
+            local_persist DWORD operation = BLACKNESS;                          // Operation to perform (fill with black color)
 
             RECT clientRect;
             GetClientRect(Window, &clientRect);
@@ -179,11 +179,11 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
     WNDCLASS WindowClass = {}; // Initialize window class structure
 
     // Configure window class properties
-    WindowClass.style = CS_HREDRAW | CS_VREDRAW; // Style flags
-    WindowClass.lpfnWndProc = Win32_MainWindowCallBack; // Pointer to window procedure
-    WindowClass.hInstance = Instance; // Instance handle
-    //WindowClass.hIcon = Icon; // Uncomment and initialize if needed
-    WindowClass.lpszClassName = L"Terraria_Window_Class"; // Class name
+    WindowClass.style = CS_HREDRAW | CS_VREDRAW;           // Style flags
+    WindowClass.lpfnWndProc = Win32_MainWindowCallBack;    // Pointer to window procedure
+    WindowClass.hInstance = Instance;                      // Instance handle
+    //WindowClass.hIcon = Icon;                            // Uncomment and initialize when needed
+    WindowClass.lpszClassName = L"Terraria_Window_Class";  // Class name
 
     // Register the window class
     if (RegisterClass(&WindowClass))
