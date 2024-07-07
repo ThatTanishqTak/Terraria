@@ -1,6 +1,7 @@
 // Include necessary Windows header file
 #include <Windows.h>
 #include <stdint.h>
+#include <xinput.h>
 
 #define internal static;
 #define local_persist static;
@@ -234,6 +235,19 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
 
                     TranslateMessage(&message); // Translate virtual-key messages into character messages
                     DispatchMessage(&message); // Dispatches a message to a window procedure
+                }
+
+                for (DWORD controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; ++controllerIndex)
+                {
+                    XINPUT_STATE controllerState;
+                    if (XInputGetState(controllerIndex, &controllerState) == ERROR_SUCCESS)
+                    {
+                        // The controller is plugged in
+                    }
+                    else
+                    {
+                        // The controller is not available
+                    }
                 }
 
                 Render(&globalBackBuffer, xOffset, yOffset);
