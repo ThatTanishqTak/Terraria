@@ -1,7 +1,7 @@
 // Include necessary Windows header file
 #include <Windows.h>
 #include <stdint.h>
-#include <xinput.h>
+#include <Xinput.h>
 
 #define internal static;
 #define local_persist static;
@@ -35,10 +35,35 @@ struct Win32_Window_Dimension
     int Height;
 };
 
+#define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE* pState)
+#define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration)
+
+typedef X_INPUT_GET_STATE(X_InputGetState);
+typedef X_INPUT_SET_STATE(X_InputSetState);
+
+X_INPUT_GET_STATE(XInputGetStateStub) { return 0; }
+X_INPUT_SET_STATE(XInputSetStateStub) { return 0; }
+
+global_variable X_InputGetState* XInputGetState_ = XInputGetStateStub;
+global_variable X_InputSetState* XInputSetState_ = XInputSetStateStub;
+
+#define XInputGetState XInputGetState_
+#define XInputSetState XInputSetState_
+
 global_variable bool running;
 global_variable Win32_Offscreen_Buffer globalBackBuffer;
 
-Win32_Window_Dimension Win32_GetWindowDimension(HWND Window)
+internal void Win32_LoadXInput(void)
+{
+    HMODULE XInputLibrary = LoadLibraryA("xinput1_3.dll");
+    if (XInputLibrary)
+    {
+        XInputGetState = (X_InputGetState*)GetProcAddress(XInputLibrary, "XInputGetState");
+        XInputSetState = (X_InputSetState*)GetProcAddress(XInputLibrary, "XInputSetState");
+    }
+}
+
+internal Win32_Window_Dimension Win32_GetWindowDimension(HWND Window)
 {
     Win32_Window_Dimension result;
 
@@ -103,15 +128,15 @@ internal void Win32_ResizeDIBSection(Win32_Offscreen_Buffer* buffer, int width, 
     buffer->Pitch = width * buffer->BytesPerPixel;
 }
 
-internal void Win32_DisplayBufferInWindow(HDC deviceContext, int windowWidth, int windowHeight, Win32_Offscreen_Buffer buffer, int x, int y, int width, int height)
+internal void Win32_DisplayBufferInWindow(HDC deviceContext, int windowWidth, int windowHeight, Win32_Offscreen_Buffer *buffer, int x, int y, int width, int height)
 {
-    StretchDIBits(deviceContext,                      // Active device context
-                  0, 0, windowWidth, windowHeight,    // Destination
-                  0, 0, buffer.Width, buffer.Height,  // Source
-                  buffer.Memory,                      // Bitmap memory
-                  &buffer.Info,                       // Bitmap information
-                  DIB_RGB_COLORS,                     // Color palate
-                  SRCCOPY);                           // DWORD property
+    StretchDIBits(deviceContext,                        // Active device context
+                  0, 0, windowWidth, windowHeight,      // Destination
+                  0, 0, buffer->Width, buffer->Height,  // Source
+                  buffer->Memory,                       // Bitmap memory
+                  &buffer->Info,                        // Bitmap information
+                  DIB_RGB_COLORS,                       // Color palate
+                  SRCCOPY);                             // DWORD property
 }
 
 // Callback function for handling window messages
@@ -151,6 +176,70 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles window
         }
         break;
 
+        // keyboard inputs
+        case WM_SYSKEYDOWN:
+        case WM_SYSKEYUP:
+        case WM_KEYDOWN:
+        case WM_KEYUP:
+        {
+           uint32 VKCode = WParam;
+           bool WasDown = ((LParam & (1 << 30)) != 0);
+           bool IsDown = ((LParam & (1 << 31)) == 0);
+
+           if (WasDown != IsDown)
+           {
+               if (VKCode == 'W')
+               {
+
+               }
+               else if (VKCode == 'A')
+               {
+
+               }
+               else if (VKCode == 'S')
+               {
+
+               }
+               else if (VKCode == 'D')
+               {
+
+               }
+               else if (VKCode == 'Q')
+               {
+
+               }
+               else if (VKCode == 'E')
+               {
+
+               }
+               else if (VKCode == VK_UP)
+               {
+
+               }
+               else if (VKCode == VK_LEFT)
+               {
+
+               }
+               else if (VKCode == VK_DOWN)
+               {
+
+               }
+               else if (VKCode == VK_RIGHT)
+               {
+
+               }
+               else if (VKCode == VK_SPACE)
+               {
+
+               }
+               else if (VKCode == VK_ESCAPE)
+               {
+
+               }
+           }
+        }
+        break;
+
         // Handle paint requests
         case WM_PAINT:
         {
@@ -164,7 +253,7 @@ LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles window
             local_persist DWORD operation = BLACKNESS;                          // Operation to perform (fill with black color)
 
             Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
-            Win32_DisplayBufferInWindow(deviceContext, dimension.Width, dimension.Height, globalBackBuffer, x, y, width, height);
+            Win32_DisplayBufferInWindow(deviceContext, dimension.Width, dimension.Height, &globalBackBuffer, x, y, width, height);
 
             EndPaint(Window, &PaintStruct); // End painting
         }
@@ -187,7 +276,9 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                    PSTR CommandLine,        // The command-line argument as an Unicode string
                    int ShowCode)            // Will be used when doing error handling
 {
-    WNDCLASS WindowClass = {}; // Initialize window class structure
+    Win32_LoadXInput();
+
+    WNDCLASSA WindowClass = {}; // Initialize window class structure
 
     Win32_ResizeDIBSection(&globalBackBuffer, 1280, 720);
 
@@ -196,15 +287,15 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
     WindowClass.lpfnWndProc = Win32_MainWindowCallBack;    // Pointer to window procedure
     WindowClass.hInstance = Instance;                      // Instance handle
     //WindowClass.hIcon = Icon;                            // Uncomment and initialize when needed
-    WindowClass.lpszClassName = L"Terraria_Window_Class";  // Class name
+    WindowClass.lpszClassName = "Terraria_Window_Class";  // Class name
 
     // Register the window class
-    if (RegisterClass(&WindowClass))
+    if (RegisterClassA(&WindowClass))
     {
         // Create the window
-        HWND Window = CreateWindowEx(NULL,                              // Optional window style
+        HWND Window = CreateWindowExA(NULL,                             // Optional window style
                                      WindowClass.lpszClassName,         // Long pointer to the class name
-                                     L"Terraria-Clone",                 // Window title
+                                     "Terraria-Clone",                  // Window title
                                      WS_OVERLAPPEDWINDOW | WS_VISIBLE,  // Window style
                                      CW_USEDEFAULT,                     // X-Position
                                      CW_USEDEFAULT,                     // Y-Position
@@ -243,6 +334,25 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                     if (XInputGetState(controllerIndex, &controllerState) == ERROR_SUCCESS)
                     {
                         // The controller is plugged in
+                        XINPUT_GAMEPAD* pad = &controllerState.Gamepad;
+
+                        bool Up = (pad->wButtons && XINPUT_GAMEPAD_DPAD_UP);
+                        bool Down = (pad->wButtons && XINPUT_GAMEPAD_DPAD_DOWN);
+                        bool Left = (pad->wButtons && XINPUT_GAMEPAD_DPAD_LEFT);
+                        bool Right = (pad->wButtons && XINPUT_GAMEPAD_DPAD_RIGHT);
+                        bool Start = (pad->wButtons && XINPUT_GAMEPAD_START);
+                        bool Back = (pad->wButtons && XINPUT_GAMEPAD_BACK);
+                        bool LeftThumb = (pad->wButtons && XINPUT_GAMEPAD_LEFT_THUMB);
+                        bool RightThumb = (pad->wButtons && XINPUT_GAMEPAD_RIGHT_THUMB);
+                        bool LeftShoulder = (pad->wButtons && XINPUT_GAMEPAD_LEFT_SHOULDER);
+                        bool RightShoulder = (pad->wButtons && XINPUT_GAMEPAD_RIGHT_SHOULDER);
+                        bool AButton = (pad->wButtons && XINPUT_GAMEPAD_A);
+                        bool BButton = (pad->wButtons && XINPUT_GAMEPAD_B);
+                        bool XButton = (pad->wButtons && XINPUT_GAMEPAD_X);
+                        bool YButton = (pad->wButtons && XINPUT_GAMEPAD_Y);
+
+                        int16 StickX = pad->sThumbLX;
+                        int16 StickY = pad->sThumbLY;
                     }
                     else
                     {
@@ -255,7 +365,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                 HDC deviceContext = GetDC(Window);
                 Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
 
-                Win32_DisplayBufferInWindow(deviceContext, dimension.Width, dimension.Height, globalBackBuffer, 0, 0, dimension.Width, dimension.Height);
+                Win32_DisplayBufferInWindow(deviceContext, dimension.Width, dimension.Height, &globalBackBuffer, 0, 0, dimension.Width, dimension.Height);
                 ReleaseDC(Window, deviceContext);
 
                 xOffset++;
