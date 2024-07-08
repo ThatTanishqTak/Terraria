@@ -356,7 +356,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
 {
     Win32_LoadXInput();
 
-    WNDCLASSA WindowClass = {}; // Initialize window class structure
+    WNDCLASSW WindowClass = {}; // Initialize window class structure
 
     Win32_ResizeDIBSection(&globalBackBuffer, 1280, 720);
 
@@ -365,15 +365,15 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
     WindowClass.lpfnWndProc = Win32_MainWindowCallBack;      // Pointer to window procedure
     WindowClass.hInstance = Instance;                        // Instance handle
     //WindowClass.hIcon = Icon;                              // Uncomment and initialize when needed
-    WindowClass.lpszClassName = "Terraria_Window_Class";     // Class name
+    WindowClass.lpszClassName = L"Terraria_Window_Class";    // Class name
 
     // Register the window class
-    if (RegisterClassA(&WindowClass))
+    if (RegisterClassW(&WindowClass))
     {
         // Create the window
-        HWND Window = CreateWindowExA(NULL,                             // Optional window style
+        HWND Window = CreateWindowExW(NULL,                             // Optional window style
                                      WindowClass.lpszClassName,         // Long pointer to the class name
-                                     "Terraria-Clone",                  // Window title
+                                     L"Terraria-Clone",                 // Window title
                                      WS_OVERLAPPEDWINDOW | WS_VISIBLE,  // Window style
                                      CW_USEDEFAULT,                     // X-Position
                                      CW_USEDEFAULT,                     // Y-Position
@@ -407,7 +407,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                     if (message.message == WM_QUIT) { running = false; }
 
                     TranslateMessage(&message); // Translate virtual-key messages into character messages
-                    DispatchMessageA(&message); // Dispatches a message to a window procedure
+                    DispatchMessageW(&message); // Dispatches a message to a window procedure
                 }
 
                 for (DWORD controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; ++controllerIndex)
