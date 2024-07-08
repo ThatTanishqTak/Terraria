@@ -140,7 +140,7 @@ internal void Win32_DisplayBufferInWindow(HDC deviceContext, int windowWidth, in
 }
 
 // Callback function for handling window messages
-LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles window
+internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles window
                                           UINT Message,   // The callback message (unsigned int)
                                           WPARAM WParam,  // Word-Parameter (unsigned int pointer)
                                           LPARAM LParam)  // Long-Parameter (long pointer)
@@ -283,10 +283,10 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
     Win32_ResizeDIBSection(&globalBackBuffer, 1280, 720);
 
     // Configure window class properties
-    WindowClass.style = CS_HREDRAW | CS_VREDRAW;           // Style flags
-    WindowClass.lpfnWndProc = Win32_MainWindowCallBack;    // Pointer to window procedure
-    WindowClass.hInstance = Instance;                      // Instance handle
-    //WindowClass.hIcon = Icon;                            // Uncomment and initialize when needed
+    WindowClass.style = CS_HREDRAW | CS_VREDRAW;          // Style flags
+    WindowClass.lpfnWndProc = Win32_MainWindowCallBack;   // Pointer to window procedure
+    WindowClass.hInstance = Instance;                     // Instance handle
+    //WindowClass.hIcon = Icon;                           // Uncomment and initialize when needed
     WindowClass.lpszClassName = "Terraria_Window_Class";  // Class name
 
     // Register the window class
@@ -316,16 +316,16 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
             while (running)
             {
                 MSG message; // Message structure
-                while (PeekMessage(&message,    // Long-pointer to the message structure
-                                   NULL,        // Handle to the current window (NULL means it will receive message from any window)
-                                   NULL,        // For minimum message range (NULL means there is no range)
-                                   NULL,        // For maximum message range (NULL means there is no range)
-                                   PM_REMOVE))  // A flag so that messages are removed from the queue after processing by PeekMessage
+                while (PeekMessageA(&message,    // Long-pointer to the message structure
+                                   NULL,         // Handle to the current window (NULL means it will receive message from any window)
+                                   NULL,         // For minimum message range (NULL means there is no range)
+                                   NULL,         // For maximum message range (NULL means there is no range)
+                                   PM_REMOVE))   // A flag so that messages are removed from the queue after processing by PeekMessage
                 {
                     if (message.message == WM_QUIT) { running = false; }
 
                     TranslateMessage(&message); // Translate virtual-key messages into character messages
-                    DispatchMessage(&message); // Dispatches a message to a window procedure
+                    DispatchMessageA(&message); // Dispatches a message to a window procedure
                 }
 
                 for (DWORD controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; ++controllerIndex)
