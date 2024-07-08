@@ -1,7 +1,7 @@
 // Include necessary Windows header file
 #include <Windows.h>
-#include <stdint.h>
 #include <Xinput.h>
+#include <stdint.h>
 
 #define internal static;
 #define local_persist static;
@@ -278,24 +278,24 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
 {
     Win32_LoadXInput();
 
-    WNDCLASSA WindowClass = {}; // Initialize window class structure
+    WNDCLASS WindowClass = {}; // Initialize window class structure
 
     Win32_ResizeDIBSection(&globalBackBuffer, 1280, 720);
 
     // Configure window class properties
-    WindowClass.style = CS_HREDRAW | CS_VREDRAW;          // Style flags
-    WindowClass.lpfnWndProc = Win32_MainWindowCallBack;   // Pointer to window procedure
-    WindowClass.hInstance = Instance;                     // Instance handle
-    //WindowClass.hIcon = Icon;                           // Uncomment and initialize when needed
-    WindowClass.lpszClassName = "Terraria_Window_Class";  // Class name
+    WindowClass.style = CS_HREDRAW | CS_VREDRAW;           // Style flags
+    WindowClass.lpfnWndProc = Win32_MainWindowCallBack;    // Pointer to window procedure
+    WindowClass.hInstance = Instance;                      // Instance handle
+    //WindowClass.hIcon = Icon;                            // Uncomment and initialize when needed
+    WindowClass.lpszClassName = L"Terraria_Window_Class";  // Class name
 
     // Register the window class
-    if (RegisterClassA(&WindowClass))
+    if (RegisterClass(&WindowClass))
     {
         // Create the window
-        HWND Window = CreateWindowExA(NULL,                             // Optional window style
+        HWND Window = CreateWindowEx(NULL,                              // Optional window style
                                      WindowClass.lpszClassName,         // Long pointer to the class name
-                                     "Terraria-Clone",                  // Window title
+                                     L"Terraria-Clone",                 // Window title
                                      WS_OVERLAPPEDWINDOW | WS_VISIBLE,  // Window style
                                      CW_USEDEFAULT,                     // X-Position
                                      CW_USEDEFAULT,                     // Y-Position
