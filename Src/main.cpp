@@ -4,10 +4,12 @@
 #include <dsound.h>
 #include <stdint.h>
 
+// Macros to differentiate between all the statics
 #define internal static;
 #define local_persist static;
 #define global_variable static;
 
+// typedef to ease using some of the other types of ints and uints
 typedef int8_t int8;
 typedef int16_t int16;
 typedef int32_t int32;
@@ -20,6 +22,7 @@ typedef uint64_t uint64;
 
 typedef int32_t bool32;
 
+// Structure that contains data about the buffer
 struct Win32_Offscreen_Buffer
 {
     BITMAPINFO Info;
@@ -32,41 +35,51 @@ struct Win32_Offscreen_Buffer
     int BytesPerPixel;
 };
 
+// Structure that contains the window dimenions
 struct Win32_Window_Dimension
 {
     int Width;
     int Height;
 };
 
+// Inorder to prevent linking the entire xinput library, 
+// I have created these macros to help in defining the two functions
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE* pState)
 #define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration)
 
+// Simillarly in the case of dsound library.
+// But here I have done this as many machines do not have direct sound in them,
+// So just define the relevent function here
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND* ppDS, LPUNKNOWN pUnkOuter);
 
+// Using typedef to ease in function creation
 typedef X_INPUT_GET_STATE(X_InputGetState);
 typedef X_INPUT_SET_STATE(X_InputSetState);
 typedef DIRECT_SOUND_CREATE(Direct_Sound_Create);
 
+// This is here for error handling purposes. 
 X_INPUT_GET_STATE(XInputGetStateStub) { return ERROR_DEVICE_NOT_CONNECTED; }
 X_INPUT_SET_STATE(XInputSetStateStub) { return ERROR_DEVICE_NOT_CONNECTED; }
 
+// Global variables for functions
 global_variable X_InputGetState* XInputGetState_ = XInputGetStateStub;
 global_variable X_InputSetState* XInputSetState_ = XInputSetStateStub;
 
+// Defining macros for the stub function
 #define XInputGetState XInputGetState_
 #define XInputSetState XInputSetState_
 
+// Global variables to be used through out the prgram
 global_variable bool running;
 global_variable Win32_Offscreen_Buffer globalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER SecondaryBuffer;
 
+// Static function to load the xinput library
 internal void Win32_LoadXInput(void)
 {
     HMODULE XInputLibrary = LoadLibraryA("xinput1_4.dll");
-    if (!XInputLibrary)
-    {
-        XInputLibrary = LoadLibraryA("xinput1_3.dll");
-    }
+    if (!XInputLibrary) { XInputLibrary = LoadLibraryA("xinput1_3.dll"); } // If version 1.4 is not avaiable
+    
     if (XInputLibrary)
     {
         XInputGetState = (X_InputGetState*)GetProcAddress(XInputLibrary, "XInputGetState");
@@ -75,6 +88,7 @@ internal void Win32_LoadXInput(void)
     else {  } // Error
 }
 
+// Static function to initialize DirectSound
 internal void Win32_InitDirectSound(HWND Window, int32 SamplesPerSecond, int32 BufferSize)
 {
     // Load the library
@@ -86,19 +100,19 @@ internal void Win32_InitDirectSound(HWND Window, int32 SamplesPerSecond, int32 B
         LPDIRECTSOUND Direct_Sound;
         if (DirectSoundCreate && SUCCEEDED(DirectSoundCreate(NULL, &Direct_Sound, NULL)))
         {
-            WAVEFORMATEX WaveFormat = {  };
+            WAVEFORMATEX WaveFormat = {  }; // Initialize WaveFormat structure to NULL
 
-            WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
-            WaveFormat.nChannels = 2;
-            WaveFormat.nSamplesPerSec = SamplesPerSecond;
-            WaveFormat.wBitsPerSample = 16;
-            WaveFormat.nBlockAlign = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
+            WaveFormat.wFormatTag      = WAVE_FORMAT_PCM;
+            WaveFormat.nChannels       = 2;
+            WaveFormat.nSamplesPerSec  = SamplesPerSecond;
+            WaveFormat.wBitsPerSample  = 16;
+            WaveFormat.nBlockAlign     = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
             WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
-            WaveFormat.cbSize = 0;
+            WaveFormat.cbSize          = 0;
 
             if (SUCCEEDED(Direct_Sound->SetCooperativeLevel(Window, DSSCL_PRIORITY)))
             {
-                DSBUFFERDESC BufferDescription = {  };
+                DSBUFFERDESC BufferDescription = {  }; // Initialize the BufferDescription struct to NULL
                 BufferDescription.dwSize = sizeof(BufferDescription);
                 BufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
 
@@ -193,7 +207,14 @@ internal void Win32_ResizeDIBSection(Win32_Offscreen_Buffer* buffer, int width, 
     buffer->Pitch = width * buffer->BytesPerPixel;
 }
 
-internal void Win32_DisplayBufferInWindow(HDC deviceContext, int windowWidth, int windowHeight, Win32_Offscreen_Buffer *buffer, int x, int y, int width, int height)
+internal void Win32_DisplayBufferInWindow(HDC deviceContext,
+                                          Win32_Offscreen_Buffer* buffer,
+                                          int windowWidth,
+                                          int windowHeight, 
+                                          int x,
+                                          int y,
+                                          int width,
+                                          int height)
 {
     StretchDIBits(deviceContext,                        // Active device context
                   0, 0, windowWidth, windowHeight,      // Destination rect
@@ -253,6 +274,7 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
 
            if (WasDown != IsDown)
            {
+               // All the keys that I will use for keyboard input
                if (VKCode == 'W')
                {
 
@@ -324,7 +346,16 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
             local_persist DWORD operation = BLACKNESS;                                             // Operation to perform (fill with black color)
 
             Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
-            Win32_DisplayBufferInWindow(deviceContext, dimension.Width, dimension.Height, &globalBackBuffer, x, y, width, height);
+            
+            // This function takes the buffer and displays it onto the screen
+            Win32_DisplayBufferInWindow(deviceContext,      // Handle to the device context 
+                                        &globalBackBuffer,  // Reference to the global back buffer
+                                        dimension.Width,    // Window width
+                                        dimension.Height,   // Window height
+                                        0,                  // X-Position
+                                        0,                  // Y-Position
+                                        dimension.Width,    // Destination width
+                                        dimension.Height);  // Destination height
 
             EndPaint(Window, &PaintStruct); // End painting
         }
@@ -428,6 +459,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                         // The controller is plugged in
                         XINPUT_GAMEPAD* pad = &controllerState.Gamepad;
 
+                        // All the inputs that I will use for a gamepad
                         bool Up            = (pad->wButtons && XINPUT_GAMEPAD_DPAD_UP);
                         bool Down          = (pad->wButtons && XINPUT_GAMEPAD_DPAD_DOWN);
                         bool Left          = (pad->wButtons && XINPUT_GAMEPAD_DPAD_LEFT);
@@ -443,20 +475,21 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                         bool XButton       = (pad->wButtons && XINPUT_GAMEPAD_X);
                         bool YButton       = (pad->wButtons && XINPUT_GAMEPAD_Y);
 
+                        // This is for the left analog stick
                         int16 StickX = pad->sThumbLX;
                         int16 StickY = pad->sThumbLY;
                     }
                     else
                     {
                         // The controller is not available
+                        // Show a message to the player that the controller is not connected
                     }
                 }
 
-                Render(&globalBackBuffer, xOffset, yOffset);
-
                 // DirectSound output test
-                DWORD PlayCursor;
-                DWORD WriteCursor;
+                DWORD PlayCursor; // This will read from the secondary buffer and play the sound
+                DWORD WriteCursor; // This will write to the secondary buffer and will be ahead of the PlayCursor
+                
                 if (SUCCEEDED(SecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
                 {
                     DWORD BytesToLock = RunningSampleIndex * BytesPerSample % SecondaryBufferSize;
@@ -476,22 +509,28 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                     VOID* Region2;
                     DWORD Region2Size;
 
-                    if (SUCCEEDED(SecondaryBuffer->Lock(BytesToLock, BytesToWrite,
-                                                        &Region1, &Region1Size,
-                                                        &Region2, &Region2Size,
-                        NULL)))
+                    // Lock the secondary buffer
+                    if (SUCCEEDED(SecondaryBuffer->Lock(BytesToLock,             // The amount of bytes to lock
+                                                        BytesToWrite,            // The amount of bytes available to write
+                                                        &Region1, &Region1Size,  // Pointer to the first region and it's size
+                                                        &Region2, &Region2Size,  // Pointer to the second region and it's size
+                                                        NULL)))                  // Addition flag
                     {
 
-                        DWORD Region1SampleCounter = Region1Size / BytesPerSample;
-                        int16* SampleOut = (int16*)Region1;
+                        DWORD Region1SampleCounter = Region1Size / BytesPerSample; // Calculate the number of samples needed for the first region based on its size and bytes per sample
+                        int16* SampleOut = (int16*)Region1; // Cast the pointer to the start of Region1 to an int16 pointer, which will be used to store the output samples
+                        
+                        // Loop through each sample in Region1
                         for (DWORD SampleIndex = 0; SampleIndex < Region1SampleCounter; SampleIndex++)
                         {
-                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
+                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume; // Set the SampleIndex based on the condition
 
+                            // Store the calculated sample value at the current position in Region1
                             *SampleOut++ = SampleValue;
                             *SampleOut++ = SampleValue;
                         }
                         
+                        // Do the same for region2
                         DWORD Region2SampleCounter = Region2Size / BytesPerSample;
                         SampleOut = (int16*)Region2;
                         for (DWORD SampleIndex = 0; SampleIndex < Region2SampleCounter; SampleIndex++)
@@ -501,6 +540,8 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                             *SampleOut++ = SampleValue;
                             *SampleOut++ = SampleValue;
                         }
+
+                        // Unlock the secondary buffer
                         SecondaryBuffer->Unlock(Region1,       // Long pointer to the first region
                                                 Region1Size,   // Size of the first pointer
                                                 Region2,       // Long pointer to the second region
@@ -508,9 +549,21 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                     }
                 }
 
-                Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
-                Win32_DisplayBufferInWindow(deviceContext, dimension.Width, dimension.Height, &globalBackBuffer, 0, 0, dimension.Width, dimension.Height);
+                Render(&globalBackBuffer, xOffset, yOffset); // Render function, just draws some animated squares
 
+                Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window); // Set the window dimension in it's own variable for easy access
+                
+                // This function takes the buffer and displays it onto the screen
+                Win32_DisplayBufferInWindow(deviceContext,      // Handle to the device context 
+                                            &globalBackBuffer,  // Reference to the global back buffer
+                                            dimension.Width,    // Window width
+                                            dimension.Height,   // Window height
+                                            0,                  // X-Position
+                                            0,                  // Y-Position
+                                            dimension.Width,    // Destination width
+                                            dimension.Height);  // Destination height
+
+                // Increase the offset after displaying to create the illusion of animation
                 xOffset++;
                 yOffset++;
             }
