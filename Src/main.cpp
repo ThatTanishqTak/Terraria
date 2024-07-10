@@ -35,21 +35,21 @@ struct Win32_Offscreen_Buffer
     int BytesPerPixel;
 };
 
-// Structure that contains the window dimenions
+// Structure that contains the window dimensions
 struct Win32_Window_Dimension
 {
     int Width;
     int Height;
 };
 
-// Inorder to prevent linking the entire xinput library, 
+// In order to prevent linking the entire xinput library, 
 // I have created these macros to help in defining the two functions
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE* pState)
 #define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION* pVibration)
 
-// Simillarly in the case of dsound library.
+// Similarly in the case of dsound library.
 // But here I have done this as many machines do not have direct sound in them,
-// So just define the relevent function here
+// So just define the relevant function here
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND* ppDS, LPUNKNOWN pUnkOuter);
 
 // Using typedef to ease in function creation
@@ -69,7 +69,7 @@ global_variable X_InputSetState* XInputSetState_ = XInputSetStateStub;
 #define XInputGetState XInputGetState_
 #define XInputSetState XInputSetState_
 
-// Global variables to be used through out the prgram
+// Global variables to be used through out the program
 global_variable bool running;
 global_variable Win32_Offscreen_Buffer globalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER SecondaryBuffer;
@@ -137,7 +137,6 @@ internal void Win32_InitDirectSound(HWND Window, int32 SamplesPerSecond, int32 B
             BufferDescription.lpwfxFormat = &WaveFormat;
 
             // "Create" a secondary buffer
-           
             if (SUCCEEDED(Direct_Sound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, NULL)))
             {
                 OutputDebugStringA("Secondary Success\n");
@@ -152,7 +151,7 @@ internal void Win32_InitDirectSound(HWND Window, int32 SamplesPerSecond, int32 B
 
 internal Win32_Window_Dimension Win32_GetWindowDimension(HWND Window)
 {
-    Win32_Window_Dimension result;
+    Win32_Window_Dimension result = {};
 
     RECT clientRect;
     GetClientRect(Window, &clientRect);
@@ -213,8 +212,8 @@ internal void Win32_DisplayBufferInWindow(HDC deviceContext,
                                           int windowHeight, 
                                           int x,
                                           int y,
-                                          int width,
-                                          int height)
+                                          int destinationWidth,
+                                          int destinationHeight)
 {
     StretchDIBits(deviceContext,                        // Active device context
                   0, 0, windowWidth, windowHeight,      // Destination rect
@@ -275,54 +274,87 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
            if (WasDown != IsDown)
            {
                // All the keys that I will use for keyboard input
-               if (VKCode == 'W')
+               switch (VKCode) 
                {
+                   case 'W':
+                   {
 
-               }
-               else if (VKCode == 'A')
-               {
+                   }
+                   break;
 
-               }
-               else if (VKCode == 'S')
-               {
+                   case 'A':
+                   {
 
-               }
-               else if (VKCode == 'D')
-               {
+                   }
+                   break;
+               
+                   case 'S':
+                   {
 
-               }
-               else if (VKCode == 'Q')
-               {
+                   }
+                   break;
+               
+                   case 'D':
+                   {
 
-               }
-               else if (VKCode == 'E')
-               {
+                   }
+                   break;
+               
+                   case 'Q':
+                   {
 
-               }
-               else if (VKCode == VK_UP)
-               {
+                   }
+                   break;
+               
+                   case 'E':
+                   {
 
-               }
-               else if (VKCode == VK_LEFT)
-               {
+                   }
+                   break;
+               
+                   case VK_UP:
+                   {
 
-               }
-               else if (VKCode == VK_DOWN)
-               {
+                   }
+                   break;
+               
+                   case VK_LEFT:
+                   {
 
-               }
-               else if (VKCode == VK_RIGHT)
-               {
+                   }
+                   break;
+               
+                   case VK_DOWN:
+                   {
 
-               }
-               else if (VKCode == VK_SPACE)
-               {
+                   }
+                   break;
+               
+                   case VK_RIGHT:
+                   {
 
-               }
-               else if (VKCode == VK_ESCAPE)
-               {
+                   }
+                   break;
+               
+                   case VK_SPACE:
+                   {
 
+                   }
+                   break;
+               
+                   case VK_ESCAPE:
+                   {
+
+                   }
+                   break;
+               
+                   default:
+                   {
+
+                   }
+                   break;
                }
+
            }
 
            bool32 AltWasDown = (LParam & (1 << 29));
@@ -364,7 +396,11 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
         // Default handler for unhandled messages
         default:
         {
-            result = DefWindowProc(Window, Message, WParam, LParam); // Call the default window procedure
+            // Call the default window procedure, This call handles all messages that are not explicitly handled by the above switch case.
+            result = DefWindowProc(Window, 
+                                   Message,
+                                   WParam,
+                                   LParam);
         }
         break;
     }
@@ -494,6 +530,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                 {
                     DWORD BytesToLock = RunningSampleIndex * BytesPerSample % SecondaryBufferSize;
                     DWORD BytesToWrite;
+
                     if (BytesToLock > PlayCursor)
                     {
                         BytesToWrite = SecondaryBufferSize - BytesToLock;
@@ -504,6 +541,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                         BytesToWrite = PlayCursor - BytesToLock;
                     }
                     
+                    // Varibales to store data into the secondary buffer
                     VOID* Region1;
                     DWORD Region1Size;
                     VOID* Region2;
