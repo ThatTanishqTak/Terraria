@@ -3,11 +3,13 @@
 #include <xinput.h>
 #include <dsound.h>
 #include <stdint.h>
+#include <math.h>
 
 // Macros to differentiate between all the statics
 #define internal static;
 #define local_persist static;
 #define global_variable static;
+#define PI32 3.14159265359f;
 
 // typedef to ease using some of the other types of ints and uints
 typedef int8_t int8;
@@ -21,6 +23,9 @@ typedef uint32_t uint32;
 typedef uint64_t uint64;
 
 typedef int32_t bool32;
+
+typedef float real32;
+typedef double real64;
 
 // Structure that contains data about the buffer
 struct Win32_Offscreen_Buffer
@@ -40,6 +45,18 @@ struct Win32_Window_Dimension
 {
     int Width;
     int Height;
+};
+
+struct Win32_Sound_Output
+{
+    // This is for sound test
+    int SamplesPerSeconds;
+    int TonesHz;
+    int16 ToneVolume;
+    uint32 RunningSampleIndex;
+    int WavePeriod;
+    int BytesPerSample;
+    int SecondaryBufferSize;
 };
 
 // In order to prevent linking the entire xinput library, 
@@ -224,6 +241,62 @@ internal void Win32_DisplayBufferInWindow(HDC deviceContext,
                   SRCCOPY);                             // DWORD property
 }
 
+internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD BytesToLock, DWORD BytesToWrite)
+{
+    // Variables to store data into the secondary buffer
+    VOID* Region1;
+    DWORD Region1Size;
+    VOID* Region2;
+    DWORD Region2Size;
+
+    // Lock the secondary buffer
+    if (SUCCEEDED(SecondaryBuffer->Lock(BytesToLock,             // The amount of bytes to lock
+                                        BytesToWrite,            // The amount of bytes available to write
+                                        &Region1, &Region1Size,  // Pointer to the first region and it's size
+                                        &Region2, &Region2Size,  // Pointer to the second region and it's size
+                                        NULL)))                  // Addition flag
+    {
+
+        DWORD Region1SampleCounter = Region1Size / SoundOutput->BytesPerSample; // Calculate the number of samples needed for the first region based on its size and bytes per sample
+        int16* SampleOut = (int16*)Region1; // Cast the pointer to the start of Region1 to an int16 pointer, which will be used to store the output samples
+
+        // Loop through each sample in Region1
+        for (DWORD SampleIndex = 0; SampleIndex < Region1SampleCounter; SampleIndex++)
+        {
+            real32 t = 2.0f * 3.14159265359f * (real32)SoundOutput->RunningSampleIndex / (real32)SoundOutput->WavePeriod;
+            real32 SineValue = sinf(t);
+            int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
+
+            // Store the calculated sample value at the current position in Region1
+            *SampleOut++ = SampleValue;
+            *SampleOut++ = SampleValue;
+
+            ++SoundOutput->RunningSampleIndex;
+        }
+
+        // Do the same for region2
+        DWORD Region2SampleCounter = Region2Size / SoundOutput->BytesPerSample;
+        SampleOut = (int16*)Region2;
+
+        for (DWORD SampleIndex = 0; SampleIndex < Region2SampleCounter; SampleIndex++)
+        {
+            real32 t = 2.0f * 3.14159265359f * (real32)SoundOutput->RunningSampleIndex / (real32)SoundOutput->WavePeriod;
+            real32 SineValue = sinf(t);
+            int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
+            *SampleOut++ = SampleValue;
+            *SampleOut++ = SampleValue;
+
+            ++SoundOutput->RunningSampleIndex;
+        }
+
+        // Unlock the secondary buffer
+        SecondaryBuffer->Unlock(Region1,       // Long pointer to the first region
+                                Region1Size,   // Size of the first pointer
+                                Region2,       // Long pointer to the second region
+                                Region2Size);  // Size of the second pointer
+    }
+}
+
 // Callback function for handling window messages
 internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles window
                                                    UINT Message,   // The callback message (unsigned int)
@@ -278,73 +351,73 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
                {
                    case 'W':
                    {
-
+                       
                    }
                    break;
 
                    case 'A':
                    {
-
+                       
                    }
                    break;
                
                    case 'S':
                    {
-
+                       
                    }
                    break;
                
                    case 'D':
                    {
-
+                       
                    }
                    break;
                
                    case 'Q':
                    {
-
+                       
                    }
                    break;
                
                    case 'E':
                    {
-
+                       
                    }
                    break;
                
                    case VK_UP:
                    {
-
+                       
                    }
                    break;
                
                    case VK_LEFT:
                    {
-
+                       
                    }
                    break;
                
                    case VK_DOWN:
                    {
-
+                       
                    }
                    break;
                
                    case VK_RIGHT:
                    {
-
+                       
                    }
                    break;
                
                    case VK_SPACE:
                    {
-
+                       
                    }
                    break;
                
                    case VK_ESCAPE:
                    {
-
+                       
                    }
                    break;
                
@@ -397,10 +470,10 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
         default:
         {
             // Call the default window procedure, This call handles all messages that are not explicitly handled by the above switch case.
-            result = DefWindowProc(Window, 
-                                   Message,
-                                   WParam,
-                                   LParam);
+            result = DefWindowProc(Window,   // Handles window
+                                   Message,  // The callback message (unsigned int)
+                                   WParam,   // Word-Parameter (unsigned int pointer)
+                                   LParam);  // Long-Parameter (long pointer)
         }
         break;
     }
@@ -451,21 +524,21 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
             // This is for graphics test
             int xOffset = 0;
             int yOffset = 0;
-
-            // This is for sound test
-            int SamplesPerSeconds = 48000;
-            int TonesHz = 256;
-            int16 ToneVolume = 1000;
-            uint32 RunningSampleIndex = 0;
-            int SquareWavePeriod = SamplesPerSeconds / TonesHz;
-            int HalfSquareWavePeriod = SquareWavePeriod / 2;
-            int BytesPerSample = sizeof(int16) * 2;
-            int SecondaryBufferSize = SamplesPerSeconds * BytesPerSample;
-
-            Win32_InitDirectSound(Window,                // Active window
-                                  SamplesPerSeconds,     // The samples hertz
-                                  SecondaryBufferSize);  // The size of the secondary buffer
             
+            Win32_Sound_Output SoundOutput = {};
+
+            SoundOutput.SamplesPerSeconds = 48000;
+            SoundOutput.TonesHz = 256;
+            SoundOutput.ToneVolume = 3000;
+            SoundOutput.RunningSampleIndex = 0;
+            SoundOutput.WavePeriod = SoundOutput.SamplesPerSeconds / SoundOutput.TonesHz;
+            SoundOutput.BytesPerSample = sizeof(int16) * 2;
+            SoundOutput.SecondaryBufferSize = SoundOutput.SamplesPerSeconds * SoundOutput.BytesPerSample;
+
+            Win32_InitDirectSound(Window,                            // Active window
+                                  SoundOutput.SamplesPerSeconds,     // The samples hertz
+                                  SoundOutput.SecondaryBufferSize);  // The size of the secondary buffer
+            Win32_FillSoundBuffer(&SoundOutput, 0, SoundOutput.SamplesPerSeconds);
             SecondaryBuffer->Play(NULL,              // Must be NULL
                                   NULL,              // Must be NULL
                                   DSBPLAY_LOOPING);  // Flag that loops the sound
@@ -522,72 +595,33 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                     }
                 }
 
+                Render(&globalBackBuffer, xOffset, yOffset); // Render function, just draws some animated squares
+
                 // DirectSound output test
                 DWORD PlayCursor; // This will read from the secondary buffer and play the sound
                 DWORD WriteCursor; // This will write to the secondary buffer and will be ahead of the PlayCursor
                 
                 if (SUCCEEDED(SecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
                 {
-                    DWORD BytesToLock = RunningSampleIndex * BytesPerSample % SecondaryBufferSize;
-                    DWORD BytesToWrite;
+                    DWORD BytesToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize;
+                    DWORD BytesToWrite = 0;
 
-                    if (BytesToLock > PlayCursor)
+                    if (BytesToLock == PlayCursor)
                     {
-                        BytesToWrite = SecondaryBufferSize - BytesToLock;
+                        BytesToWrite = 0;
+                    }
+                    else if (BytesToLock > PlayCursor)
+                    {
+                        BytesToWrite = SoundOutput.SecondaryBufferSize - BytesToLock;
                         BytesToWrite += PlayCursor;
                     }
                     else
                     {
                         BytesToWrite = PlayCursor - BytesToLock;
                     }
-                    
-                    // Varibales to store data into the secondary buffer
-                    VOID* Region1;
-                    DWORD Region1Size;
-                    VOID* Region2;
-                    DWORD Region2Size;
 
-                    // Lock the secondary buffer
-                    if (SUCCEEDED(SecondaryBuffer->Lock(BytesToLock,             // The amount of bytes to lock
-                                                        BytesToWrite,            // The amount of bytes available to write
-                                                        &Region1, &Region1Size,  // Pointer to the first region and it's size
-                                                        &Region2, &Region2Size,  // Pointer to the second region and it's size
-                                                        NULL)))                  // Addition flag
-                    {
-
-                        DWORD Region1SampleCounter = Region1Size / BytesPerSample; // Calculate the number of samples needed for the first region based on its size and bytes per sample
-                        int16* SampleOut = (int16*)Region1; // Cast the pointer to the start of Region1 to an int16 pointer, which will be used to store the output samples
-                        
-                        // Loop through each sample in Region1
-                        for (DWORD SampleIndex = 0; SampleIndex < Region1SampleCounter; SampleIndex++)
-                        {
-                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume; // Set the SampleIndex based on the condition
-
-                            // Store the calculated sample value at the current position in Region1
-                            *SampleOut++ = SampleValue;
-                            *SampleOut++ = SampleValue;
-                        }
-                        
-                        // Do the same for region2
-                        DWORD Region2SampleCounter = Region2Size / BytesPerSample;
-                        SampleOut = (int16*)Region2;
-                        for (DWORD SampleIndex = 0; SampleIndex < Region2SampleCounter; SampleIndex++)
-                        {
-                            int16 SampleValue = ((RunningSampleIndex++ / HalfSquareWavePeriod) % 2) ? ToneVolume : -ToneVolume;
-
-                            *SampleOut++ = SampleValue;
-                            *SampleOut++ = SampleValue;
-                        }
-
-                        // Unlock the secondary buffer
-                        SecondaryBuffer->Unlock(Region1,       // Long pointer to the first region
-                                                Region1Size,   // Size of the first pointer
-                                                Region2,       // Long pointer to the second region
-                                                Region2Size);  // Size of the second pointer
-                    }
+                    Win32_FillSoundBuffer(&SoundOutput, BytesToLock, BytesToWrite);
                 }
-
-                Render(&globalBackBuffer, xOffset, yOffset); // Render function, just draws some animated squares
 
                 Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window); // Set the window dimension in it's own variable for easy access
                 
