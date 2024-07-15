@@ -9,7 +9,7 @@
 #define internal static;
 #define local_persist static;
 #define global_variable static;
-#define PI32 3.14159265359f;
+constexpr auto PI32 = 3.14159265359f;;
 
 // typedef to ease using some of the other types of ints and uints
 typedef int8_t int8;
@@ -47,18 +47,6 @@ struct Win32_Window_Dimension
     int Height;
 };
 
-struct Win32_Sound_Output
-{
-    // This is for sound test
-    int SamplesPerSeconds;
-    int TonesHz;
-    int16 ToneVolume;
-    uint32 RunningSampleIndex;
-    int WavePeriod;
-    int BytesPerSample;
-    int SecondaryBufferSize;
-};
-
 // In order to prevent linking the entire xinput library, 
 // I have created these macros to help in defining the two functions
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE* pState)
@@ -89,7 +77,7 @@ global_variable X_InputSetState* XInputSetState_ = XInputSetStateStub;
 // Global variables to be used through out the program
 global_variable bool running;
 global_variable Win32_Offscreen_Buffer globalBackBuffer;
-global_variable LPDIRECTSOUNDBUFFER SecondaryBuffer;
+global_variable LPDIRECTSOUNDBUFFER SecondaryAudioBuffer;
 
 // Static function to load the xinput library
 internal void Win32_LoadXInput(void)
@@ -154,7 +142,7 @@ internal void Win32_InitDirectSound(HWND Window, int32 SamplesPerSecond, int32 B
             BufferDescription.lpwfxFormat = &WaveFormat;
 
             // "Create" a secondary buffer
-            if (SUCCEEDED(Direct_Sound->CreateSoundBuffer(&BufferDescription, &SecondaryBuffer, NULL)))
+            if (SUCCEEDED(Direct_Sound->CreateSoundBuffer(&BufferDescription, &SecondaryAudioBuffer, NULL)))
             {
                 OutputDebugStringA("Secondary Success\n");
             }
@@ -241,6 +229,19 @@ internal void Win32_DisplayBufferInWindow(HDC deviceContext,
                   SRCCOPY);                             // DWORD property
 }
 
+struct Win32_Sound_Output
+{
+    // This is for sound test
+    int SamplesPerSeconds;
+    int TonesHz;
+    int16 ToneVolume;
+    uint32 RunningSampleIndex;
+    int WavePeriod;
+    int BytesPerSample;
+    int SecondaryBufferSize;
+    real32 tSine;
+};
+
 internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD BytesToLock, DWORD BytesToWrite)
 {
     // Variables to store data into the secondary buffer
@@ -250,7 +251,7 @@ internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD Bytes
     DWORD Region2Size;
 
     // Lock the secondary buffer
-    if (SUCCEEDED(SecondaryBuffer->Lock(BytesToLock,             // The amount of bytes to lock
+    if (SUCCEEDED(SecondaryAudioBuffer->Lock(BytesToLock,             // The amount of bytes to lock
                                         BytesToWrite,            // The amount of bytes available to write
                                         &Region1, &Region1Size,  // Pointer to the first region and it's size
                                         &Region2, &Region2Size,  // Pointer to the second region and it's size
@@ -263,9 +264,9 @@ internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD Bytes
         // Loop through each sample in Region1
         for (DWORD SampleIndex = 0; SampleIndex < Region1SampleCounter; SampleIndex++)
         {
-            real32 t = 2.0f * 3.14159265359f * (real32)SoundOutput->RunningSampleIndex / (real32)SoundOutput->WavePeriod;
-            real32 SineValue = sinf(t);
+            real32 SineValue = sinf(SoundOutput->tSine);
             int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
+            SoundOutput->tSine += 2.0f * PI32 * 1.0f / (real32)SoundOutput->WavePeriod;
 
             // Store the calculated sample value at the current position in Region1
             *SampleOut++ = SampleValue;
@@ -280,17 +281,17 @@ internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD Bytes
 
         for (DWORD SampleIndex = 0; SampleIndex < Region2SampleCounter; SampleIndex++)
         {
-            real32 t = 2.0f * 3.14159265359f * (real32)SoundOutput->RunningSampleIndex / (real32)SoundOutput->WavePeriod;
-            real32 SineValue = sinf(t);
+            real32 SineValue = sinf(SoundOutput->tSine);
             int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
             *SampleOut++ = SampleValue;
             *SampleOut++ = SampleValue;
 
+            SoundOutput->tSine += 2.0f * PI32 * 1.0f / (real32)SoundOutput->WavePeriod;
             ++SoundOutput->RunningSampleIndex;
         }
 
         // Unlock the secondary buffer
-        SecondaryBuffer->Unlock(Region1,       // Long pointer to the first region
+        SecondaryAudioBuffer->Unlock(Region1,  // Long pointer to the first region
                                 Region1Size,   // Size of the first pointer
                                 Region2,       // Long pointer to the second region
                                 Region2Size);  // Size of the second pointer
@@ -357,7 +358,7 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
 
                    case 'A':
                    {
-                       
+
                    }
                    break;
                
@@ -539,7 +540,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                                   SoundOutput.SamplesPerSeconds,     // The samples hertz
                                   SoundOutput.SecondaryBufferSize);  // The size of the secondary buffer
             Win32_FillSoundBuffer(&SoundOutput, 0, SoundOutput.SamplesPerSeconds);
-            SecondaryBuffer->Play(NULL,              // Must be NULL
+            SecondaryAudioBuffer->Play(NULL,         // Must be NULL
                                   NULL,              // Must be NULL
                                   DSBPLAY_LOOPING);  // Flag that loops the sound
 
@@ -601,16 +602,12 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                 DWORD PlayCursor; // This will read from the secondary buffer and play the sound
                 DWORD WriteCursor; // This will write to the secondary buffer and will be ahead of the PlayCursor
                 
-                if (SUCCEEDED(SecondaryBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
+                if (SUCCEEDED(SecondaryAudioBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
                 {
                     DWORD BytesToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize;
                     DWORD BytesToWrite = 0;
 
-                    if (BytesToLock == PlayCursor)
-                    {
-                        BytesToWrite = 0;
-                    }
-                    else if (BytesToLock > PlayCursor)
+                    if (BytesToLock > PlayCursor)
                     {
                         BytesToWrite = SoundOutput.SecondaryBufferSize - BytesToLock;
                         BytesToWrite += PlayCursor;
