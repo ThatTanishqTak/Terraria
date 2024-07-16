@@ -75,7 +75,7 @@ global_variable X_InputSetState* XInputSetState_ = XInputSetStateStub;
 #define XInputSetState XInputSetState_
 
 // Global variables to be used through out the program
-global_variable bool running;
+global_variable bool32 running;
 global_variable Win32_Offscreen_Buffer globalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER SecondaryAudioBuffer;
 
@@ -83,6 +83,7 @@ global_variable LPDIRECTSOUNDBUFFER SecondaryAudioBuffer;
 internal void Win32_LoadXInput(void)
 {
     HMODULE XInputLibrary = LoadLibraryA("xinput1_4.dll");
+    if (!XInputLibrary) { XInputLibrary = LoadLibraryA("xinput9_1_0.dll"); } // If version 1.4 is not avaiable
     if (!XInputLibrary) { XInputLibrary = LoadLibraryA("xinput1_3.dll"); } // If version 1.4 is not avaiable
     
     if (XInputLibrary)
@@ -239,6 +240,7 @@ struct Win32_Sound_Output
     int WavePeriod;
     int BytesPerSample;
     int SecondaryBufferSize;
+    int LatencySampleCount;
     real32 tSine;
 };
 
@@ -342,8 +344,8 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
         case WM_KEYUP:
         {
            uint32 VKCode = WParam;
-           bool WasDown = (LParam & (1 << 30)) != 0;
-           bool IsDown  = (LParam & (1 << 31)) == 0;
+           bool32 WasDown = (LParam & (1 << 30)) != 0;
+           bool32 IsDown  = (LParam & (1 << 31)) == 0;
 
            if (WasDown != IsDown)
            {
@@ -535,11 +537,12 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
             SoundOutput.WavePeriod = SoundOutput.SamplesPerSeconds / SoundOutput.TonesHz;
             SoundOutput.BytesPerSample = sizeof(int16) * 2;
             SoundOutput.SecondaryBufferSize = SoundOutput.SamplesPerSeconds * SoundOutput.BytesPerSample;
+            SoundOutput.LatencySampleCount = SoundOutput.SamplesPerSeconds / 15;
 
             Win32_InitDirectSound(Window,                            // Active window
                                   SoundOutput.SamplesPerSeconds,     // The samples hertz
                                   SoundOutput.SecondaryBufferSize);  // The size of the secondary buffer
-            Win32_FillSoundBuffer(&SoundOutput, 0, SoundOutput.SamplesPerSeconds);
+            Win32_FillSoundBuffer(&SoundOutput, 0, SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample);
             SecondaryAudioBuffer->Play(NULL,         // Must be NULL
                                   NULL,              // Must be NULL
                                   DSBPLAY_LOOPING);  // Flag that loops the sound
@@ -570,20 +573,20 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                         XINPUT_GAMEPAD* pad = &controllerState.Gamepad;
 
                         // All the inputs that I will use for a gamepad
-                        bool Up            = (pad->wButtons && XINPUT_GAMEPAD_DPAD_UP);
-                        bool Down          = (pad->wButtons && XINPUT_GAMEPAD_DPAD_DOWN);
-                        bool Left          = (pad->wButtons && XINPUT_GAMEPAD_DPAD_LEFT);
-                        bool Right         = (pad->wButtons && XINPUT_GAMEPAD_DPAD_RIGHT);
-                        bool Start         = (pad->wButtons && XINPUT_GAMEPAD_START);
-                        bool Back          = (pad->wButtons && XINPUT_GAMEPAD_BACK);
-                        bool LeftThumb     = (pad->wButtons && XINPUT_GAMEPAD_LEFT_THUMB);
-                        bool RightThumb    = (pad->wButtons && XINPUT_GAMEPAD_RIGHT_THUMB);
-                        bool LeftShoulder  = (pad->wButtons && XINPUT_GAMEPAD_LEFT_SHOULDER);
-                        bool RightShoulder = (pad->wButtons && XINPUT_GAMEPAD_RIGHT_SHOULDER);
-                        bool AButton       = (pad->wButtons && XINPUT_GAMEPAD_A);
-                        bool BButton       = (pad->wButtons && XINPUT_GAMEPAD_B);
-                        bool XButton       = (pad->wButtons && XINPUT_GAMEPAD_X);
-                        bool YButton       = (pad->wButtons && XINPUT_GAMEPAD_Y);
+                        bool32 Up            = (pad->wButtons && XINPUT_GAMEPAD_DPAD_UP);
+                        bool32 Down          = (pad->wButtons && XINPUT_GAMEPAD_DPAD_DOWN);
+                        bool32 Left          = (pad->wButtons && XINPUT_GAMEPAD_DPAD_LEFT);
+                        bool32 Right         = (pad->wButtons && XINPUT_GAMEPAD_DPAD_RIGHT);
+                        bool32 Start         = (pad->wButtons && XINPUT_GAMEPAD_START);
+                        bool32 Back          = (pad->wButtons && XINPUT_GAMEPAD_BACK);
+                        bool32 LeftThumb     = (pad->wButtons && XINPUT_GAMEPAD_LEFT_THUMB);
+                        bool32 RightThumb    = (pad->wButtons && XINPUT_GAMEPAD_RIGHT_THUMB);
+                        bool32 LeftShoulder  = (pad->wButtons && XINPUT_GAMEPAD_LEFT_SHOULDER);
+                        bool32 RightShoulder = (pad->wButtons && XINPUT_GAMEPAD_RIGHT_SHOULDER);
+                        bool32 AButton       = (pad->wButtons && XINPUT_GAMEPAD_A);
+                        bool32 BButton       = (pad->wButtons && XINPUT_GAMEPAD_B);
+                        bool32 XButton       = (pad->wButtons && XINPUT_GAMEPAD_X);
+                        bool32 YButton       = (pad->wButtons && XINPUT_GAMEPAD_Y);
 
                         // This is for the left analog stick
                         int16 StickX = pad->sThumbLX;
@@ -605,16 +608,17 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                 if (SUCCEEDED(SecondaryAudioBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
                 {
                     DWORD BytesToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize;
+                    DWORD TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample)) % SoundOutput.SecondaryBufferSize;
                     DWORD BytesToWrite = 0;
 
-                    if (BytesToLock > PlayCursor)
+                    if (BytesToLock > TargetCursor)
                     {
                         BytesToWrite = SoundOutput.SecondaryBufferSize - BytesToLock;
-                        BytesToWrite += PlayCursor;
+                        BytesToWrite += TargetCursor;
                     }
                     else
                     {
-                        BytesToWrite = PlayCursor - BytesToLock;
+                        BytesToWrite = TargetCursor - BytesToLock;
                     }
 
                     Win32_FillSoundBuffer(&SoundOutput, BytesToLock, BytesToWrite);
