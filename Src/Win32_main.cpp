@@ -490,6 +490,10 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                    PSTR CommandLine,        // The command-line argument as an Unicode string
                    int ShowCode)            // Will be used when doing error handling
 {
+    LARGE_INTEGER PerformanceCounterFrequencyResult;
+    QueryPerformanceFrequency(&PerformanceCounterFrequencyResult);
+    int64 PerformanceCounterFrequency = PerformanceCounterFrequencyResult.QuadPart;
+
     Win32_LoadXInput();
 
     WNDCLASSW WindowClass = {}; // Initialize window class structure
@@ -542,13 +546,22 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
             Win32_InitDirectSound(Window,                            // Active window
                                   SoundOutput.SamplesPerSeconds,     // The samples hertz
                                   SoundOutput.SecondaryBufferSize);  // The size of the secondary buffer
-            Win32_FillSoundBuffer(&SoundOutput, 0, SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample);
-            SecondaryAudioBuffer->Play(NULL,         // Must be NULL
-                                  NULL,              // Must be NULL
-                                  DSBPLAY_LOOPING);  // Flag that loops the sound
+
+            Win32_FillSoundBuffer(&SoundOutput, 
+                                  0, 
+                                  SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample);
+
+            SecondaryAudioBuffer->Play(NULL,              // Must be NULL
+                                       NULL,              // Must be NULL
+                                       DSBPLAY_LOOPING);  // Flag that loops the sound
+
+            running = true;
+
+            LARGE_INTEGER LastCounter;
+            QueryPerformanceCounter(&LastCounter);
 
             // Main message loop
-            running = true;
+            int64 LastCycleCount = __rdtsc();
             while (running)
             {
                 MSG message; // Message structure
@@ -636,9 +649,24 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                                             dimension.Width,    // Destination width
                                             dimension.Height);  // Destination height
 
-                // Increase the offset after displaying to create the illusion of animation
-                xOffset++;
-                yOffset++;
+                int64 EndCycleCount = __rdtsc();;
+                
+                LARGE_INTEGER EndCounter;
+                QueryPerformanceCounter(&EndCounter);
+
+                // Display the value here
+                int64 CycleElapsed = EndCycleCount - LastCycleCount;
+                int64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
+                int32 MSPerFrame = (int32)(1000 * CounterElapsed) / PerformanceCounterFrequency;
+                int32 FramesPerSeconds = PerformanceCounterFrequency / CounterElapsed;
+                int32 MegaCyclesPerSeconds = CycleElapsed / (1000 * 1000);
+
+                char Buffer[256];
+                wsprintfA(Buffer, "%dMilliSeconds/Frames, %dFrames/Second, %dMegaCycles/Frame\n", MSPerFrame, FramesPerSeconds, MegaCyclesPerSeconds);
+                OutputDebugStringA(Buffer);
+
+                LastCounter = EndCounter;
+                LastCycleCount = EndCycleCount;
             }
         }
         else {  } // Handle error if window creation fails
