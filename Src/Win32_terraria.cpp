@@ -1,9 +1,24 @@
-// Windows header file
-#include <windows.h>
-#include <xinput.h>
-#include <dsound.h>
+                                                         /*------- THIS IS NOT A FINAL PLATFORM LAYER -------
+                                                          TODO:
+                                                           -Save game location
+                                                           -Getting handle to our executable
+                                                           -Assets loading
+                                                           -Threading (Launch a thread)
+                                                           -Raw input (Support multiple keyboards)
+                                                           -Sleep/timeBeginPeriod
+                                                           -ClipCursor() (For multimonitor support)
+                                                           -Fullscreen support
+                                                           -WM_SETCURSOR (Control cursor visibility)
+                                                           -QueryCancelAutoPlay
+                                                           -WM_ACTIVATEAPP (When application is not active)
+                                                           -Blit speed improvement (BitBlt)
+                                                           -Hardware acceleration (OpenGL, Direct3D or both?)
+                                                           -GetKeyboardLayout (For international keyboard)
+
+                                                         --------------------------------------------------*/
+
+// PUT THIS ON TOP TO GET RID OF ALL THE TYPEDEF ERRORS
 #include <stdint.h>
-#include <math.h>
 
 // Macros to differentiate between all the statics
 #define internal static;
@@ -29,6 +44,12 @@ typedef double real64;
 
 // Game header files
 #include "Terraria.cpp"
+
+// Windows header file
+#include <windows.h>
+#include <xinput.h>
+#include <dsound.h>
+#include <math.h>
 
 // Structure that contains data about the buffer
 struct Win32_Offscreen_Buffer
@@ -294,177 +315,176 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
     switch (Message)
     {
         // Handle size change event
-    case WM_SIZE:
-    {
-
-    }
-    break;
-
-    // Handle close request
-    case WM_CLOSE:
-    {
-        running = false;
-    }
-    break;
-
-    // Handle application activation/deactivation
-    case WM_ACTIVATEAPP:
-    {
-        // Debug output
-        OutputDebugStringA("WM_ACTIVEAPP\n");
-    }
-    break;
-
-    // Handle window destroy event
-    case WM_DESTROY:
-    {
-        // Error handling and maybe restart the window as this should only be called when the window is closed due to an error
-        running = false;
-    }
-    break;
-
-    // keyboard inputs
-    case WM_SYSKEYDOWN:
-    case WM_SYSKEYUP:
-    case WM_KEYDOWN:
-    case WM_KEYUP:
-    {
-        uint32 VKCode = WParam;
-        bool32 WasDown = (LParam & (1 << 30)) != 0;
-        bool32 IsDown = (LParam & (1 << 31)) == 0;
-
-        if (WasDown != IsDown)
+        case WM_SIZE:
         {
-            // All the keys that I will use for keyboard input
-            switch (VKCode)
-            {
-            case 'W':
-            {
-
-            }
-            break;
-
-            case 'A':
-            {
-
-            }
-            break;
-
-            case 'S':
-            {
-
-            }
-            break;
-
-            case 'D':
-            {
-
-            }
-            break;
-
-            case 'Q':
-            {
-
-            }
-            break;
-
-            case 'E':
-            {
-
-            }
-            break;
-
-            case VK_UP:
-            {
-
-            }
-            break;
-
-            case VK_LEFT:
-            {
-
-            }
-            break;
-
-            case VK_DOWN:
-            {
-
-            }
-            break;
-
-            case VK_RIGHT:
-            {
-
-            }
-            break;
-
-            case VK_SPACE:
-            {
-
-            }
-            break;
-
-            case VK_ESCAPE:
-            {
-
-            }
-            break;
-
-            default:
-            {
-
-            }
-            break;
-            }
 
         }
+        break;
 
-        bool32 AltWasDown = (LParam & (1 << 29));
-        if ((VKCode == VK_F4) && AltWasDown)
+        // Handle close request
+        case WM_CLOSE:
         {
             running = false;
         }
-    }
-    break;
+        break;
 
-    // Handle paint requests
-    case WM_PAINT:
-    {
-        PAINTSTRUCT PaintStruct; // Structure containing information about painting
-        HDC deviceContext = BeginPaint(Window, &PaintStruct); // Start painting
+        // Handle application activation/deactivation
+        case WM_ACTIVATEAPP:
+        {
+            // Debug output
+            OutputDebugStringA("WM_ACTIVEAPP\n");
+        }
+        break;
 
-        int x = PaintStruct.rcPaint.left;                                   // Left edge of the area to be painted
-        int y = PaintStruct.rcPaint.top;                                    // Top edge of the area to be painted
-        int height = PaintStruct.rcPaint.bottom - PaintStruct.rcPaint.top;  // Height of the area to be painted
-        int width = PaintStruct.rcPaint.right - PaintStruct.rcPaint.left;   // Width of the area to be painted
-        local_persist DWORD operation = BLACKNESS;                          // Operation to perform (fill with black color)
+        // Handle window destroy event
+        case WM_DESTROY:
+        {
+            // Error handling and maybe restart the window as this should only be called when the window is closed due to an error
+            running = false;
+        }
+        break;
 
-        Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
+        // keyboard inputs
+        case WM_SYSKEYDOWN:
+        case WM_SYSKEYUP:
+        case WM_KEYDOWN:
+        case WM_KEYUP:
+        {
+            uint32 VKCode = WParam;
+            bool32 WasDown = (LParam & (1 << 30)) != 0;
+            bool32 IsDown = (LParam & (1 << 31)) == 0;
 
-        // This function takes the buffer and displays it onto the screen
-        Win32_DisplayBufferInWindow(deviceContext,      // Handle to the device context 
-                                    &globalBackBuffer,  // Reference to the global back buffer
-                                    dimension.Width,    // Window width
-                                    dimension.Height,   // Window height
-                                    0,                  // X-Position
-                                    0,                  // Y-Position
-                                    dimension.Width,    // Destination width
-                                    dimension.Height);  // Destination height
+            if (WasDown != IsDown)
+            {
+                // All the keys that I will use for keyboard input
+                switch (VKCode)
+                {
+                    case 'W':
+                    {
 
-        EndPaint(Window, &PaintStruct); // End painting
-    }
-    break;
+                    }
+                    break;
 
-    // Default handler for unhandled messages
-    default:
-    {
-        // Call the default window procedure, This call handles all messages that are not explicitly handled by the above switch case.
-        result = DefWindowProc(Window,   // Handles window
-                               Message,  // The callback message (unsigned int)
-                               WParam,   // Word-Parameter (unsigned int pointer)
-                               LParam);  // Long-Parameter (long pointer)
-    }
-    break;
+                    case 'A':
+                    {
+
+                    }
+                    break;
+
+                    case 'S':
+                    {
+
+                    }
+                    break;
+
+                    case 'D':
+                    {
+
+                    }
+                    break;
+
+                    case 'Q':
+                    {
+
+                    }
+                    break;
+
+                    case 'E':
+                    {
+
+                    }
+                    break;
+
+                    case VK_UP:
+                    {
+
+                    }
+                    break;
+
+                    case VK_LEFT:
+                    {
+
+                    }
+                    break;
+
+                    case VK_DOWN:
+                    {
+
+                    }
+                    break;
+
+                    case VK_RIGHT:
+                    {
+
+                    }
+                    break;
+
+                    case VK_SPACE:
+                    {
+
+                    }
+                    break;
+
+                    case VK_ESCAPE:
+                    {
+
+                    }
+                    break;
+
+                    default:
+                    {
+                        OutputDebugStringA("KEY NOT BINDED\n");
+                    }
+                    break;
+                }
+            }
+
+            bool32 AltWasDown = (LParam & (1 << 29));
+            if ((VKCode == VK_F4) && AltWasDown)
+            {
+                running = false;
+            }
+        }
+        break;
+
+        // Handle paint requests
+        case WM_PAINT:
+        {
+            PAINTSTRUCT PaintStruct; // Structure containing information about painting
+            HDC deviceContext = BeginPaint(Window, &PaintStruct); // Start painting
+
+            int x = PaintStruct.rcPaint.left;                                   // Left edge of the area to be painted
+            int y = PaintStruct.rcPaint.top;                                    // Top edge of the area to be painted
+            int height = PaintStruct.rcPaint.bottom - PaintStruct.rcPaint.top;  // Height of the area to be painted
+            int width = PaintStruct.rcPaint.right - PaintStruct.rcPaint.left;   // Width of the area to be painted
+            local_persist DWORD operation = BLACKNESS;                          // Operation to perform (fill with black color)
+
+            Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
+
+            // This function takes the buffer and displays it onto the screen
+            Win32_DisplayBufferInWindow(deviceContext,      // Handle to the device context 
+                                        &globalBackBuffer,  // Reference to the global back buffer
+                                        dimension.Width,    // Window width
+                                        dimension.Height,   // Window height
+                                        0,                  // X-Position
+                                        0,                  // Y-Position
+                                        dimension.Width,    // Destination width
+                                        dimension.Height);  // Destination height
+
+            EndPaint(Window, &PaintStruct); // End painting
+        }
+        break;
+
+        // Default handler for unhandled messages
+        default:
+        {
+            // Call the default window procedure, This call handles all messages that are not explicitly handled by the above switch case.
+            result = DefWindowProc(Window,   // Handles window
+                                   Message,  // The callback message (unsigned int)
+                                   WParam,   // Word-Parameter (unsigned int pointer)
+                                   LParam);  // Long-Parameter (long pointer)
+        }
+        break;
     }
 
     return result; // Return the result of the message handling
@@ -483,7 +503,6 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
     Win32_LoadXInput();
 
     WNDCLASSW WindowClass = {}; // Initialize window class structure
-
     Win32_ResizeDIBSection(&globalBackBuffer, 1280, 720);
 
     // Configure window class properties
@@ -497,7 +516,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
     if (RegisterClassW(&WindowClass))
     {
         // Create the window
-        HWND Window = CreateWindowExW(NULL,                             // Optional window style
+        HWND Window = CreateWindowExW(NULL,                              // Optional window style
                                       WindowClass.lpszClassName,         // Long pointer to the class name
                                       L"Terraria-Clone",                 // Window title
                                       WS_OVERLAPPEDWINDOW | WS_VISIBLE,  // Window style
@@ -599,10 +618,12 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                 }
                 
                 game_Offscreen_Buffer Buffer = {};
+                
                 Buffer.Memory = globalBackBuffer.Memory;
                 Buffer.Width = globalBackBuffer.Width;
                 Buffer.Height = globalBackBuffer.Height;
                 Buffer.Pitch = globalBackBuffer.Pitch;
+                
                 GameUpdateAndRender(&Buffer, xOffset, yOffset);
 
                 // DirectSound output test
