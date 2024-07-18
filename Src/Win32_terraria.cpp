@@ -1,4 +1,4 @@
-// Include necessary Windows header file
+// Windows header file
 #include <windows.h>
 #include <xinput.h>
 #include <dsound.h>
@@ -9,7 +9,7 @@
 #define internal static;
 #define local_persist static;
 #define global_variable static;
-constexpr auto PI32 = 3.14159265359f;;
+constexpr auto PI32 = 3.14159265359f;
 
 // typedef to ease using some of the other types of ints and uints
 typedef int8_t int8;
@@ -27,11 +27,13 @@ typedef int32_t bool32;
 typedef float real32;
 typedef double real64;
 
+// Game header files
+#include "Terraria.cpp"
+
 // Structure that contains data about the buffer
 struct Win32_Offscreen_Buffer
 {
     BITMAPINFO Info;
-
     void* Memory;
 
     int Width;
@@ -85,13 +87,13 @@ internal void Win32_LoadXInput(void)
     HMODULE XInputLibrary = LoadLibraryA("xinput1_4.dll");
     if (!XInputLibrary) { XInputLibrary = LoadLibraryA("xinput9_1_0.dll"); } // If version 1.4 is not avaiable
     if (!XInputLibrary) { XInputLibrary = LoadLibraryA("xinput1_3.dll"); } // If version 1.4 is not avaiable
-    
+
     if (XInputLibrary)
     {
         XInputGetState = (X_InputGetState*)GetProcAddress(XInputLibrary, "XInputGetState");
         XInputSetState = (X_InputSetState*)GetProcAddress(XInputLibrary, "XInputSetState");
     }
-    else {  } // Error
+    else {} // Error
 }
 
 // Static function to initialize DirectSound
@@ -102,19 +104,19 @@ internal void Win32_InitDirectSound(HWND Window, int32 SamplesPerSecond, int32 B
     if (DirectSoundLibrary)
     {
         // Get a DirectSound object
-        Direct_Sound_Create *DirectSoundCreate = (Direct_Sound_Create*)GetProcAddress(DirectSoundLibrary, "DirectSoundCreate");
+        Direct_Sound_Create* DirectSoundCreate = (Direct_Sound_Create*)GetProcAddress(DirectSoundLibrary, "DirectSoundCreate");
         LPDIRECTSOUND Direct_Sound;
         if (DirectSoundCreate && SUCCEEDED(DirectSoundCreate(NULL, &Direct_Sound, NULL)))
         {
             WAVEFORMATEX WaveFormat = {  }; // Initialize WaveFormat structure to NULL
 
-            WaveFormat.wFormatTag      = WAVE_FORMAT_PCM;
-            WaveFormat.nChannels       = 2;
-            WaveFormat.nSamplesPerSec  = SamplesPerSecond;
-            WaveFormat.wBitsPerSample  = 16;
-            WaveFormat.nBlockAlign     = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
+            WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
+            WaveFormat.nChannels = 2;
+            WaveFormat.nSamplesPerSec = SamplesPerSecond;
+            WaveFormat.wBitsPerSample = 16;
+            WaveFormat.nBlockAlign = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
             WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
-            WaveFormat.cbSize          = 0;
+            WaveFormat.cbSize = 0;
 
             if (SUCCEEDED(Direct_Sound->SetCooperativeLevel(Window, DSSCL_PRIORITY)))
             {
@@ -130,11 +132,11 @@ internal void Win32_InitDirectSound(HWND Window, int32 SamplesPerSecond, int32 B
                     {
                         OutputDebugStringA("Primary Success\n");
                     }
-                    else {  } // Error
+                    else {} // Error
                 }
-                else {  } // Error
+                else {} // Error
             }
-            else {  } // Error
+            else {} // Error
 
             DSBUFFERDESC BufferDescription = {  };
             BufferDescription.dwSize = sizeof(BufferDescription);
@@ -147,11 +149,11 @@ internal void Win32_InitDirectSound(HWND Window, int32 SamplesPerSecond, int32 B
             {
                 OutputDebugStringA("Secondary Success\n");
             }
-            else {  } // Error
+            else {} // Error
 
             // Start it playing
         }
-        else {  } // Error
+        else {} // Error
     }
 }
 
@@ -168,42 +170,24 @@ internal Win32_Window_Dimension Win32_GetWindowDimension(HWND Window)
     return result;
 }
 
-internal void Render(Win32_Offscreen_Buffer* buffer, int xOffset, int yOffset)
-{
-    uint8* row = (uint8*)buffer->Memory;
-    for (int y = 0; y < buffer->Height; ++y)
-    {
-        uint32* pixels = (uint32*)row;
-        for (int x = 0; x < buffer->Width; ++x)
-        {
-            uint8 blue = (x + xOffset);
-            uint8 green = (y + yOffset);
-
-            *pixels++ = ((green << 8) | blue);
-        }
-
-        row += buffer->Pitch;
-    }
-}
-
 internal void Win32_ResizeDIBSection(Win32_Offscreen_Buffer* buffer, int width, int height)
 {
     if (buffer->Memory)
     {
         VirtualFree(buffer->Memory,  // Address to where the memory is
-                    NULL,            // Size of the memory to the region to be freed (If NULL means the entire block)
-                    MEM_RELEASE);    // Releases the specified region of pages
+            NULL,            // Size of the memory to the region to be freed (If NULL means the entire block)
+            MEM_RELEASE);    // Releases the specified region of pages
     }
 
-    buffer->Width         = width;
-    buffer->Height        = height;
+    buffer->Width = width;
+    buffer->Height = height;
     buffer->BytesPerPixel = 4;
 
-    buffer->Info.bmiHeader.biSize        = sizeof(buffer->Info.bmiHeader);
-    buffer->Info.bmiHeader.biWidth       = buffer->Width;
-    buffer->Info.bmiHeader.biHeight      = -buffer->Height;
-    buffer->Info.bmiHeader.biPlanes      = 1;
-    buffer->Info.bmiHeader.biBitCount    = 32;
+    buffer->Info.bmiHeader.biSize = sizeof(buffer->Info.bmiHeader);
+    buffer->Info.bmiHeader.biWidth = buffer->Width;
+    buffer->Info.bmiHeader.biHeight = -buffer->Height;
+    buffer->Info.bmiHeader.biPlanes = 1;
+    buffer->Info.bmiHeader.biBitCount = 32;
     buffer->Info.bmiHeader.biCompression = BI_RGB;
 
     int bitmapMemorySize = (buffer->Width * buffer->Height) * buffer->BytesPerPixel;
@@ -214,12 +198,10 @@ internal void Win32_ResizeDIBSection(Win32_Offscreen_Buffer* buffer, int width, 
 
 internal void Win32_DisplayBufferInWindow(HDC deviceContext,
                                           Win32_Offscreen_Buffer* buffer,
-                                          int windowWidth,
-                                          int windowHeight, 
+                                          int windowWidth, int windowHeight,
                                           int x,
                                           int y,
-                                          int destinationWidth,
-                                          int destinationHeight)
+                                          int destinationWidth, int destinationHeight)
 {
     StretchDIBits(deviceContext,                        // Active device context
                   0, 0, windowWidth, windowHeight,      // Destination rect
@@ -254,10 +236,10 @@ internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD Bytes
 
     // Lock the secondary buffer
     if (SUCCEEDED(SecondaryAudioBuffer->Lock(BytesToLock,             // The amount of bytes to lock
-                                        BytesToWrite,            // The amount of bytes available to write
-                                        &Region1, &Region1Size,  // Pointer to the first region and it's size
-                                        &Region2, &Region2Size,  // Pointer to the second region and it's size
-                                        NULL)))                  // Addition flag
+                                             BytesToWrite,            // The amount of bytes available to write
+                                             &Region1, &Region1Size,  // Pointer to the first region and it's size
+                                             &Region2, &Region2Size,  // Pointer to the second region and it's size
+                                             NULL)))                  // Addition flag
     {
 
         DWORD Region1SampleCounter = Region1Size / SoundOutput->BytesPerSample; // Calculate the number of samples needed for the first region based on its size and bytes per sample
@@ -294,9 +276,9 @@ internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD Bytes
 
         // Unlock the secondary buffer
         SecondaryAudioBuffer->Unlock(Region1,  // Long pointer to the first region
-                                Region1Size,   // Size of the first pointer
-                                Region2,       // Long pointer to the second region
-                                Region2Size);  // Size of the second pointer
+                                     Region1Size,   // Size of the first pointer
+                                     Region2,       // Long pointer to the second region
+                                     Region2Size);  // Size of the second pointer
     }
 }
 
@@ -312,173 +294,177 @@ internal LRESULT CALLBACK Win32_MainWindowCallBack(HWND Window,    // Handles wi
     switch (Message)
     {
         // Handle size change event
-        case WM_SIZE:
+    case WM_SIZE:
+    {
+
+    }
+    break;
+
+    // Handle close request
+    case WM_CLOSE:
+    {
+        running = false;
+    }
+    break;
+
+    // Handle application activation/deactivation
+    case WM_ACTIVATEAPP:
+    {
+        // Debug output
+        OutputDebugStringA("WM_ACTIVEAPP\n");
+    }
+    break;
+
+    // Handle window destroy event
+    case WM_DESTROY:
+    {
+        // Error handling and maybe restart the window as this should only be called when the window is closed due to an error
+        running = false;
+    }
+    break;
+
+    // keyboard inputs
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP:
+    case WM_KEYDOWN:
+    case WM_KEYUP:
+    {
+        uint32 VKCode = WParam;
+        bool32 WasDown = (LParam & (1 << 30)) != 0;
+        bool32 IsDown = (LParam & (1 << 31)) == 0;
+
+        if (WasDown != IsDown)
         {
+            // All the keys that I will use for keyboard input
+            switch (VKCode)
+            {
+            case 'W':
+            {
+
+            }
+            break;
+
+            case 'A':
+            {
+
+            }
+            break;
+
+            case 'S':
+            {
+
+            }
+            break;
+
+            case 'D':
+            {
+
+            }
+            break;
+
+            case 'Q':
+            {
+
+            }
+            break;
+
+            case 'E':
+            {
+
+            }
+            break;
+
+            case VK_UP:
+            {
+
+            }
+            break;
+
+            case VK_LEFT:
+            {
+
+            }
+            break;
+
+            case VK_DOWN:
+            {
+
+            }
+            break;
+
+            case VK_RIGHT:
+            {
+
+            }
+            break;
+
+            case VK_SPACE:
+            {
+
+            }
+            break;
+
+            case VK_ESCAPE:
+            {
+
+            }
+            break;
+
+            default:
+            {
+
+            }
+            break;
+            }
 
         }
-        break;
 
-        // Handle close request
-        case WM_CLOSE:
+        bool32 AltWasDown = (LParam & (1 << 29));
+        if ((VKCode == VK_F4) && AltWasDown)
         {
             running = false;
         }
-        break;
+    }
+    break;
 
-        // Handle application activation/deactivation
-        case WM_ACTIVATEAPP: { OutputDebugStringA("WM_ACTIVEAPP\n"); } // Debug output
-        break;
+    // Handle paint requests
+    case WM_PAINT:
+    {
+        PAINTSTRUCT PaintStruct; // Structure containing information about painting
+        HDC deviceContext = BeginPaint(Window, &PaintStruct); // Start painting
 
-        // Handle window destroy event
-        case WM_DESTROY:
-        {
-            // Error handling and maybe restart the window as this should only be called when the window is closed due to an error
-            running = false;
-        }
-        break;
+        int x = PaintStruct.rcPaint.left;                                   // Left edge of the area to be painted
+        int y = PaintStruct.rcPaint.top;                                    // Top edge of the area to be painted
+        int height = PaintStruct.rcPaint.bottom - PaintStruct.rcPaint.top;  // Height of the area to be painted
+        int width = PaintStruct.rcPaint.right - PaintStruct.rcPaint.left;   // Width of the area to be painted
+        local_persist DWORD operation = BLACKNESS;                          // Operation to perform (fill with black color)
 
-        // keyboard inputs
-        case WM_SYSKEYDOWN:
-        case WM_SYSKEYUP:
-        case WM_KEYDOWN:
-        case WM_KEYUP:
-        {
-           uint32 VKCode = WParam;
-           bool32 WasDown = (LParam & (1 << 30)) != 0;
-           bool32 IsDown  = (LParam & (1 << 31)) == 0;
+        Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
 
-           if (WasDown != IsDown)
-           {
-               // All the keys that I will use for keyboard input
-               switch (VKCode) 
-               {
-                   case 'W':
-                   {
-                       
-                   }
-                   break;
+        // This function takes the buffer and displays it onto the screen
+        Win32_DisplayBufferInWindow(deviceContext,      // Handle to the device context 
+                                    &globalBackBuffer,  // Reference to the global back buffer
+                                    dimension.Width,    // Window width
+                                    dimension.Height,   // Window height
+                                    0,                  // X-Position
+                                    0,                  // Y-Position
+                                    dimension.Width,    // Destination width
+                                    dimension.Height);  // Destination height
 
-                   case 'A':
-                   {
+        EndPaint(Window, &PaintStruct); // End painting
+    }
+    break;
 
-                   }
-                   break;
-               
-                   case 'S':
-                   {
-                       
-                   }
-                   break;
-               
-                   case 'D':
-                   {
-                       
-                   }
-                   break;
-               
-                   case 'Q':
-                   {
-                       
-                   }
-                   break;
-               
-                   case 'E':
-                   {
-                       
-                   }
-                   break;
-               
-                   case VK_UP:
-                   {
-                       
-                   }
-                   break;
-               
-                   case VK_LEFT:
-                   {
-                       
-                   }
-                   break;
-               
-                   case VK_DOWN:
-                   {
-                       
-                   }
-                   break;
-               
-                   case VK_RIGHT:
-                   {
-                       
-                   }
-                   break;
-               
-                   case VK_SPACE:
-                   {
-                       
-                   }
-                   break;
-               
-                   case VK_ESCAPE:
-                   {
-                       
-                   }
-                   break;
-               
-                   default:
-                   {
-
-                   }
-                   break;
-               }
-
-           }
-
-           bool32 AltWasDown = (LParam & (1 << 29));
-           if ((VKCode == VK_F4) && AltWasDown)
-           {
-               running = false;
-           }
-        }
-        break;
-
-        // Handle paint requests
-        case WM_PAINT:
-        {
-            PAINTSTRUCT PaintStruct; // Structure containing information about painting
-            HDC deviceContext = BeginPaint(Window, &PaintStruct); // Start painting
-
-            int x                         = PaintStruct.rcPaint.left;                              // Left edge of the area to be painted
-            int y                         = PaintStruct.rcPaint.top;                               // Top edge of the area to be painted
-            int height                    = PaintStruct.rcPaint.bottom - PaintStruct.rcPaint.top;  // Height of the area to be painted
-            int width                     = PaintStruct.rcPaint.right - PaintStruct.rcPaint.left;  // Width of the area to be painted
-            local_persist DWORD operation = BLACKNESS;                                             // Operation to perform (fill with black color)
-
-            Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window);
-            
-            // This function takes the buffer and displays it onto the screen
-            Win32_DisplayBufferInWindow(deviceContext,      // Handle to the device context 
-                                        &globalBackBuffer,  // Reference to the global back buffer
-                                        dimension.Width,    // Window width
-                                        dimension.Height,   // Window height
-                                        0,                  // X-Position
-                                        0,                  // Y-Position
-                                        dimension.Width,    // Destination width
-                                        dimension.Height);  // Destination height
-
-            EndPaint(Window, &PaintStruct); // End painting
-        }
-        break;
-
-        // Default handler for unhandled messages
-        default:
-        {
-            // Call the default window procedure, This call handles all messages that are not explicitly handled by the above switch case.
-            result = DefWindowProc(Window,   // Handles window
-                                   Message,  // The callback message (unsigned int)
-                                   WParam,   // Word-Parameter (unsigned int pointer)
-                                   LParam);  // Long-Parameter (long pointer)
-        }
-        break;
+    // Default handler for unhandled messages
+    default:
+    {
+        // Call the default window procedure, This call handles all messages that are not explicitly handled by the above switch case.
+        result = DefWindowProc(Window,   // Handles window
+                               Message,  // The callback message (unsigned int)
+                               WParam,   // Word-Parameter (unsigned int pointer)
+                               LParam);  // Long-Parameter (long pointer)
+    }
+    break;
     }
 
     return result; // Return the result of the message handling
@@ -512,17 +498,17 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
     {
         // Create the window
         HWND Window = CreateWindowExW(NULL,                             // Optional window style
-                                     WindowClass.lpszClassName,         // Long pointer to the class name
-                                     L"Terraria-Clone",                 // Window title
-                                     WS_OVERLAPPEDWINDOW | WS_VISIBLE,  // Window style
-                                     CW_USEDEFAULT,                     // X-Position
-                                     CW_USEDEFAULT,                     // Y-Position
-                                     CW_USEDEFAULT,                     // Width
-                                     CW_USEDEFAULT,                     // Height
-                                     NULL,                              // Set parent window
-                                     NULL,                              // Set menu
-                                     Instance,                          // Active window instance
-                                     NULL);                             // Additional application data (Long void pointer)
+                                      WindowClass.lpszClassName,         // Long pointer to the class name
+                                      L"Terraria-Clone",                 // Window title
+                                      WS_OVERLAPPEDWINDOW | WS_VISIBLE,  // Window style
+                                      CW_USEDEFAULT,                     // X-Position
+                                      CW_USEDEFAULT,                     // Y-Position
+                                      CW_USEDEFAULT,                     // Width
+                                      CW_USEDEFAULT,                     // Height
+                                      NULL,                              // Set parent window
+                                      NULL,                              // Set menu
+                                      Instance,                          // Active window instance
+                                      NULL);                             // Additional application data (Long void pointer)
 
         if (Window) // Check if window creation was successful
         {
@@ -531,7 +517,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
             // This is for graphics test
             int xOffset = 0;
             int yOffset = 0;
-            
+
             Win32_Sound_Output SoundOutput = {};
 
             SoundOutput.SamplesPerSeconds = 48000;
@@ -547,8 +533,8 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                                   SoundOutput.SamplesPerSeconds,     // The samples hertz
                                   SoundOutput.SecondaryBufferSize);  // The size of the secondary buffer
 
-            Win32_FillSoundBuffer(&SoundOutput, 
-                                  0, 
+            Win32_FillSoundBuffer(&SoundOutput,
+                                  0,
                                   SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample);
 
             SecondaryAudioBuffer->Play(NULL,              // Must be NULL
@@ -611,13 +597,18 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                         // Show a message to the player that the controller is not connected
                     }
                 }
-
-                Render(&globalBackBuffer, xOffset, yOffset); // Render function, just draws some animated squares
+                
+                game_Offscreen_Buffer Buffer = {};
+                Buffer.Memory = globalBackBuffer.Memory;
+                Buffer.Width = globalBackBuffer.Width;
+                Buffer.Height = globalBackBuffer.Height;
+                Buffer.Pitch = globalBackBuffer.Pitch;
+                GameUpdateAndRender(&Buffer, xOffset, yOffset);
 
                 // DirectSound output test
                 DWORD PlayCursor; // This will read from the secondary buffer and play the sound
                 DWORD WriteCursor; // This will write to the secondary buffer and will be ahead of the PlayCursor
-                
+
                 if (SUCCEEDED(SecondaryAudioBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
                 {
                     DWORD BytesToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize;
@@ -638,7 +629,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                 }
 
                 Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window); // Set the window dimension in it's own variable for easy access
-                
+
                 // This function takes the buffer and displays it onto the screen
                 Win32_DisplayBufferInWindow(deviceContext,      // Handle to the device context 
                                             &globalBackBuffer,  // Reference to the global back buffer
@@ -650,7 +641,7 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                                             dimension.Height);  // Destination height
 
                 int64 EndCycleCount = __rdtsc();;
-                
+
                 LARGE_INTEGER EndCounter;
                 QueryPerformanceCounter(&EndCounter);
 
@@ -660,18 +651,18 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                 int32 MSPerFrame = (int32)(1000 * CounterElapsed) / PerformanceCounterFrequency;
                 int32 FramesPerSeconds = PerformanceCounterFrequency / CounterElapsed;
                 int32 MegaCyclesPerSeconds = CycleElapsed / (1000 * 1000);
-
+#if 0
                 char Buffer[256];
                 wsprintfA(Buffer, "%dMilliSeconds/Frames, %dFrames/Second, %dMegaCycles/Frame\n", MSPerFrame, FramesPerSeconds, MegaCyclesPerSeconds);
                 OutputDebugStringA(Buffer);
-
+#endif
                 LastCounter = EndCounter;
                 LastCycleCount = EndCycleCount;
             }
         }
-        else {  } // Handle error if window creation fails
+        else {} // Handle error if window creation fails
     }
-    else {  } // Handle error if window class registration fails
+    else {} // Handle error if window class registration fails
 
     return 0; // Return 0 to indicate successful execution
 }

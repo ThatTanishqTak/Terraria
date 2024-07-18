@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
 project(Terraria)
 
-set(SOURCE "Src/Win32_main.cpp")
+set(SOURCE "Src/Win32_terraria.cpp" "Src/Terraria.cpp")
 
-add_executable(Terraria ${SOURCE})
+add_executable(${PROJECT_NAME} ${SOURCE})
+include_directories("Include")
 
-set_target_properties(Terraria PROPERTIES ENTRY_POINT "WinMain")
-set_target_properties(Terraria PROPERTIES LINK_FLAGS "-mwindows")
+set_target_properties(${PROJECT_NAME} PROPERTIES ENTRY_POINT "WinMain" LINK_FLAGS "-mwindows")
