@@ -17,8 +17,9 @@
 
                                                          --------------------------------------------------*/
 
-// PUT THIS ON TOP TO GET RID OF ALL THE TYPEDEF ERRORS
+// PUT THIS HERE TO STOP THE COMPILER FROM BITCHING
 #include <stdint.h>
+#include <math.h>
 
 // Macros to differentiate between all the statics
 #define internal static;
@@ -49,7 +50,7 @@ typedef double real64;
 #include <windows.h>
 #include <xinput.h>
 #include <dsound.h>
-#include <math.h>
+#include <malloc.h>
 
 // Structure that contains data about the buffer
 struct Win32_Offscreen_Buffer
@@ -196,8 +197,8 @@ internal void Win32_ResizeDIBSection(Win32_Offscreen_Buffer* buffer, int width, 
     if (buffer->Memory)
     {
         VirtualFree(buffer->Memory,  // Address to where the memory is
-            NULL,            // Size of the memory to the region to be freed (If NULL means the entire block)
-            MEM_RELEASE);    // Releases the specified region of pages
+                    NULL,            // Size of the memory to the region to be freed (If NULL means the entire block)
+                    MEM_RELEASE);    // Releases the specified region of pages
     }
 
     buffer->Width = width;
@@ -213,7 +214,7 @@ internal void Win32_ResizeDIBSection(Win32_Offscreen_Buffer* buffer, int width, 
 
     int bitmapMemorySize = (buffer->Width * buffer->Height) * buffer->BytesPerPixel;
 
-    buffer->Memory = VirtualAlloc(NULL, bitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
+    buffer->Memory = VirtualAlloc(NULL, bitmapMemorySize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     buffer->Pitch = width * buffer->BytesPerPixel;
 }
 
@@ -247,7 +248,46 @@ struct Win32_Sound_Output
     real32 tSine;
 };
 
-internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD BytesToLock, DWORD BytesToWrite)
+internal void Win32_ClearBuffer(Win32_Sound_Output* SoundOutput)
+{
+    // Variables to store data into the secondary buffer
+    VOID* Region1;
+    DWORD Region1Size;
+    VOID* Region2;
+    DWORD Region2Size;
+
+    if (SUCCEEDED(SecondaryAudioBuffer->Lock(0,
+                                             SoundOutput->SecondaryBufferSize, 
+                                             &Region1, &Region1Size,
+                                             &Region2, &Region2Size,
+                                             0)))                  // Addition flag
+    {
+        uint8* DestSample = (uint8*)Region1; // Cast the pointer to the start of Region1 to an uint8 pointer, which will be used to store the output samples
+
+        // Loop through each sample in Region1
+        for (DWORD ByteIndex = 0; ByteIndex < Region1Size; ByteIndex++)
+        {
+            // Clear the sample
+            *DestSample++ = 0;
+        }
+
+        DestSample = (uint8*)Region2; // Cast the pointer to the start of Region1 to an uint8 pointer, which will be used to store the output samples
+
+        // Loop through each sample in Region2
+        for (DWORD ByteIndex = 0; ByteIndex < Region2Size; ByteIndex++)
+        {
+            // Clear the sample
+            *DestSample++ = 0;
+        }
+
+        SecondaryAudioBuffer->Unlock(Region1,
+                                     Region1Size,
+                                     Region2,
+                                     Region2Size);
+    }
+}
+
+internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD BytesToLock, DWORD BytesToWrite, game_Sound_Output_Buffer* SourceBuffer)
 {
     // Variables to store data into the secondary buffer
     VOID* Region1;
@@ -264,34 +304,29 @@ internal void Win32_FillSoundBuffer(Win32_Sound_Output* SoundOutput, DWORD Bytes
     {
 
         DWORD Region1SampleCounter = Region1Size / SoundOutput->BytesPerSample; // Calculate the number of samples needed for the first region based on its size and bytes per sample
-        int16* SampleOut = (int16*)Region1; // Cast the pointer to the start of Region1 to an int16 pointer, which will be used to store the output samples
+        int16* DestSample = (int16*)Region1; // Cast the pointer to the start of Region1 to an int16 pointer, which will be used to store the output samples
+        int16* SourceSample = SourceBuffer->Samples;
 
         // Loop through each sample in Region1
         for (DWORD SampleIndex = 0; SampleIndex < Region1SampleCounter; SampleIndex++)
         {
-            real32 SineValue = sinf(SoundOutput->tSine);
-            int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
-            SoundOutput->tSine += 2.0f * PI32 * 1.0f / (real32)SoundOutput->WavePeriod;
-
             // Store the calculated sample value at the current position in Region1
-            *SampleOut++ = SampleValue;
-            *SampleOut++ = SampleValue;
+            *DestSample++ = *SourceSample++;
+            *DestSample++ = *SourceSample++;
 
             ++SoundOutput->RunningSampleIndex;
         }
 
         // Do the same for region2
         DWORD Region2SampleCounter = Region2Size / SoundOutput->BytesPerSample;
-        SampleOut = (int16*)Region2;
+        DestSample = (int16*)Region2;
 
         for (DWORD SampleIndex = 0; SampleIndex < Region2SampleCounter; SampleIndex++)
         {
-            real32 SineValue = sinf(SoundOutput->tSine);
-            int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
-            *SampleOut++ = SampleValue;
-            *SampleOut++ = SampleValue;
+            // Store the calculated sample value at the current position in Region2
+            *DestSample++ = *SourceSample++;
+            *DestSample++ = *SourceSample++;
 
-            SoundOutput->tSine += 2.0f * PI32 * 1.0f / (real32)SoundOutput->WavePeriod;
             ++SoundOutput->RunningSampleIndex;
         }
 
@@ -552,15 +587,15 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                                   SoundOutput.SamplesPerSeconds,     // The samples hertz
                                   SoundOutput.SecondaryBufferSize);  // The size of the secondary buffer
 
-            Win32_FillSoundBuffer(&SoundOutput,
-                                  0,
-                                  SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample);
+            Win32_ClearBuffer(&SoundOutput);
 
             SecondaryAudioBuffer->Play(NULL,              // Must be NULL
                                        NULL,              // Must be NULL
                                        DSBPLAY_LOOPING);  // Flag that loops the sound
 
             running = true;
+
+            int16* Samples = (int16*)VirtualAlloc(NULL, SoundOutput.SecondaryBufferSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
             LARGE_INTEGER LastCounter;
             QueryPerformanceCounter(&LastCounter);
@@ -616,25 +651,18 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                         // Show a message to the player that the controller is not connected
                     }
                 }
-                
-                game_Offscreen_Buffer Buffer = {};
-                
-                Buffer.Memory = globalBackBuffer.Memory;
-                Buffer.Width = globalBackBuffer.Width;
-                Buffer.Height = globalBackBuffer.Height;
-                Buffer.Pitch = globalBackBuffer.Pitch;
-                
-                GameUpdateAndRender(&Buffer, xOffset, yOffset);
 
-                // DirectSound output test
+                DWORD BytesToLock;
+                DWORD TargetCursor;
+                DWORD BytesToWrite;
                 DWORD PlayCursor; // This will read from the secondary buffer and play the sound
                 DWORD WriteCursor; // This will write to the secondary buffer and will be ahead of the PlayCursor
 
+                bool32 SoundIsValid = false;
                 if (SUCCEEDED(SecondaryAudioBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
                 {
-                    DWORD BytesToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize;
-                    DWORD TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample)) % SoundOutput.SecondaryBufferSize;
-                    DWORD BytesToWrite = 0;
+                    BytesToLock = (SoundOutput.RunningSampleIndex * SoundOutput.BytesPerSample) % SoundOutput.SecondaryBufferSize;
+                    TargetCursor = (PlayCursor + (SoundOutput.LatencySampleCount * SoundOutput.BytesPerSample)) % SoundOutput.SecondaryBufferSize;
 
                     if (BytesToLock > TargetCursor)
                     {
@@ -646,7 +674,26 @@ int WINAPI WinMain(HINSTANCE Instance,      // Handle to the instance
                         BytesToWrite = TargetCursor - BytesToLock;
                     }
 
-                    Win32_FillSoundBuffer(&SoundOutput, BytesToLock, BytesToWrite);
+                    SoundIsValid = true;
+                }
+
+                game_Sound_Output_Buffer SoundBuffer = {};
+                SoundBuffer.SamplesPerSecond         = SoundOutput.SamplesPerSeconds;
+                SoundBuffer.SampleCount              = BytesToWrite / SoundOutput.BytesPerSample;
+                SoundBuffer.Samples                  = Samples;
+
+                game_Offscreen_Buffer Buffer = {};
+                Buffer.Memory                = globalBackBuffer.Memory;
+                Buffer.Width                 = globalBackBuffer.Width;
+                Buffer.Height                = globalBackBuffer.Height;
+                Buffer.Pitch                 = globalBackBuffer.Pitch;
+
+                GameUpdateAndRender(&Buffer, xOffset, yOffset, &SoundBuffer);
+
+                // DirectSound output test
+                if (SoundIsValid)
+                {
+                    Win32_FillSoundBuffer(&SoundOutput, BytesToLock, BytesToWrite, &SoundBuffer);
                 }
 
                 Win32_Window_Dimension dimension = Win32_GetWindowDimension(Window); // Set the window dimension in it's own variable for easy access

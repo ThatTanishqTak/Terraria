@@ -11,7 +11,14 @@ struct game_Offscreen_Buffer
     int BytesPerPixel;
 };
 
-internal void GameUpdateAndRender(game_Offscreen_Buffer* Buffer, int xOffset, int yOffset);
+struct game_Sound_Output_Buffer
+{
+    int SamplesPerSecond;
+    int SampleCount;
+    int16* Samples;
+};
+
+internal void GameUpdateAndRender(game_Offscreen_Buffer* Buffer, int xOffset, int yOffset, game_Sound_Output_Buffer* SoundBuffer);
 
 #define TERRARIA_H
 #endif
